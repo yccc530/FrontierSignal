@@ -1,6 +1,6 @@
 # 开发与测试
 
-[返回项目首页](../README.md) · [架构说明](architecture.md) · [历史验收记录](validation-history.md)
+[返回项目首页](../README.zh-CN.md) · [架构说明](architecture.md) · [历史验收记录](validation-history.md)
 
 普通用户只需按 [安装指南](installation.md) 启动应用，不需要执行这里的验证脚本。本文面向修改代码、排查问题或验证新来源的开发者。
 

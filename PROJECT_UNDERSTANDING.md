@@ -2,7 +2,8 @@
 
 初始审计日期：2026-10-22，Asia/Shanghai。下列环境信息描述开发时状态，不是使用者的安装前提。
 
-面向使用者的说明见 [README](README.md)、[安装指南](docs/installation.md) 和 [使用指南](docs/usage.md)。
+面向使用者的说明见 [中文 README](README.zh-CN.md)、[English README](README.md)、[安装指南](docs/installation.md) 和 [使用指南](docs/usage.md)。
+仓库默认首页使用英文，其他语言采用 `README.<语言标签>.md`；现有详细指南和应用界面仍为中文。
 
 FrontierSignal 是个人中文 AI 情报工作台。原始内容与来源可追溯，分析结果有
 模型与处理记录，采集或模型故障不会丢失已有资讯。

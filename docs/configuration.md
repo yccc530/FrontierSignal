@@ -1,6 +1,6 @@
 # 配置说明
 
-[返回项目首页](../README.md) · [使用指南](usage.md) · [信息来源](data-sources.md)
+[返回项目首页](../README.zh-CN.md) · [使用指南](usage.md) · [信息来源](data-sources.md)
 
 ## 配置在哪里
 

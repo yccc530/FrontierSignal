@@ -1,6 +1,6 @@
 # 故障排查
 
-[返回项目首页](../README.md) · [安装指南](installation.md) · [配置说明](configuration.md)
+[返回项目首页](../README.zh-CN.md) · [安装指南](installation.md) · [配置说明](configuration.md)
 
 ## 先定位哪一层出错
 

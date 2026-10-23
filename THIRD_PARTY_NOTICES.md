@@ -1,6 +1,6 @@
 # 第三方声明
 
-[返回项目首页](README.md) · [上游复用评估](REUSE_ASSESSMENT.md)
+[返回项目首页](README.zh-CN.md) · [上游复用评估](REUSE_ASSESSMENT.md)
 
 本文件说明实际复用的代码、组件和来源标识。各项原始许可证保留原文，不因中文说明而改变。
 FrontierSignal 的项目代码与文档采用 [MIT 许可证](LICENSE)。第三方代码和依赖仍保留各自的版权与许可；项目许可证不重新授权采集内容或第三方商标。

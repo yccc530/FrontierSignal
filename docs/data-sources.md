@@ -1,6 +1,6 @@
 # 信息来源与采集范围
 
-[返回项目首页](../README.md) · [管理来源](usage.md#管理来源) · [配置预算与代理](configuration.md)
+[返回项目首页](../README.zh-CN.md) · [管理来源](usage.md#管理来源) · [配置预算与代理](configuration.md)
 
 优先公开 HTTPS RSS/Atom 和官方 API，不执行登录、验证码处理、浏览器指纹模拟。
 

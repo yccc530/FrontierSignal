@@ -1,6 +1,6 @@
 # 安装与启动
 
-[返回项目首页](../README.md) · [下一步：使用指南](usage.md) · [遇到问题](troubleshooting.md)
+[返回项目首页](../README.zh-CN.md) · [下一步：使用指南](usage.md) · [遇到问题](troubleshooting.md)
 
 本文面向首次安装、日常启动和版本更新。所有命令都在克隆后的 **FrontierSignal 项目根目录**运行，除非特别说明。
 

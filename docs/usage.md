@@ -1,6 +1,6 @@
 # 使用指南
 
-[返回项目首页](../README.md) · [安装与启动](installation.md) · [配置说明](configuration.md)
+[返回项目首页](../README.zh-CN.md) · [安装与启动](installation.md) · [配置说明](configuration.md)
 
 ## 第一次使用
 

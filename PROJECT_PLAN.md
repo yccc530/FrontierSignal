@@ -2,8 +2,17 @@
 
 每阶段必须实现、测试、记录验收后推进。代码完成与外部服务验收分别记录。
 
-新用户从 [README](README.md) 和 [安装指南](docs/installation.md) 开始；本文保留项目开发进度。
+新用户从 [中文 README](README.zh-CN.md)、[English README](README.md) 和 [安装指南](docs/installation.md) 开始；本文保留项目开发进度。
 测试方法见 [开发与测试](docs/testing.md)，带日期的结果见 [历史验收记录](docs/validation-history.md)。
+
+## 双语 README 与本地启动（2026-10-24）
+
+- 默认 `README.md` 改为完整英文介绍与快速上手，中文内容保留在 `README.zh-CN.md`。
+- 两个入口互相链接，共用现有截图；中文指南首页链接继续指向中文入口。
+- 约定未来译本使用根目录 `README.<语言标签>.md`，同步功能、命令和语言导航，不新增空白语言占位。
+- 明确当前界面、AI 摘要及详细指南仍以中文为主，README 翻译不代表界面国际化已实现。
+- 复用已有 WSL PostgreSQL 和依赖启动服务；仅做启动、页面与文档检查，不因翻译重跑付费模型或全量采集。
+- 本轮按用户要求发布：上一批 GLM/Meta 功能与本批双语文档分别提交，再推送 GitHub。
 
 ## 模型厂商扩展（2026-10-23）
 

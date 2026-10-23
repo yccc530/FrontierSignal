@@ -1,6 +1,6 @@
 # 备份与恢复
 
-[返回项目首页](../README.md) · [更新版本](installation.md#更新版本) · [故障排查](troubleshooting.md)
+[返回项目首页](../README.zh-CN.md) · [更新版本](installation.md#更新版本) · [故障排查](troubleshooting.md)
 
 ## 需要保存什么
 
