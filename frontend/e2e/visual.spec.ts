@@ -15,6 +15,12 @@ const pages = [
   },
   { route: "/feed", title: "资讯库", api: "/articles", ready: ".article-row" },
   {
+    route: "/feed?content_type=models",
+    title: "资讯库",
+    api: "/articles",
+    ready: ".model-facts",
+  },
+  {
     route: "/favorites",
     title: "我的收藏",
     api: "/articles",
@@ -41,7 +47,7 @@ async function checkReadability(page: Page) {
       h1: 28,
       ".project-name, .article-title, .recommend-title": 17,
       ".project-description, .article-preview, .recommend-summary": 15,
-      ".nav-label, .page-heading p, .eyebrow, .muted, .recommend-meta, .article-meta, .technical-tags span, .project-footer > span, .project-numbers dt, .project-reason-preview, .data-table th, .source-cell small, .source-url, .task-id, .status-list dt, .status-list dd, .form-stack label, .key-status small, .interest-preview, .state-badge, .empty-state p, .error-banner": 13,
+      ".nav-label, .page-heading p, .eyebrow, .muted, .recommend-meta, .article-meta, .technical-tags span, .project-footer > span, .project-numbers dt, .project-reason-preview, .data-table th, .source-cell small, .source-url, .task-id, .status-list dt, .status-list dd, .form-stack label, .key-status small, .interest-preview, .state-badge, .empty-state p, .error-banner, .model-tags span, .model-tags strong, .model-links a, .interest-options small": 13,
     };
     const issues: string[] = [];
     const ratios: number[] = [];
@@ -107,6 +113,8 @@ for (const width of [1024, 1440, 1920]) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     for (const entry of pages) {
+      // A hash navigation can reuse fresh Query data without another HTTP request.
+      await page.goto("about:blank");
       const response = page.waitForResponse(
         (value) =>
           new URL(value.url()).pathname === `/api${entry.api}` &&
@@ -129,6 +137,7 @@ for (const width of [1024, 1440, 1920]) {
       const heading = await page
         .locator(".page-heading")
         .evaluate((element) => {
+          if (element.children.length < 2) return true;
           const title = element.firstElementChild!.getBoundingClientRect();
           const actions = element.lastElementChild!.getBoundingClientRect();
           return title.right <= actions.left;
@@ -170,6 +179,11 @@ for (const width of [1024, 1440, 1920]) {
       if (width === 1024 && entry.route === "/settings")
         await page.screenshot({
           path: "../.runtime/ui-desktop-1024-settings.png",
+          animations: "disabled",
+        });
+      if (entry.route === "/feed?content_type=models")
+        await page.screenshot({
+          path: `../.runtime/ui-desktop-${width}-models.png`,
           animations: "disabled",
         });
       if (
@@ -240,4 +254,12 @@ test("recommendations expose loading, empty and request failure states", async (
   await page.reload();
   await expect(page.locator(".interest-panel")).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.route("**/api/sources", (route) => route.fulfill({ json: [] }));
+  await page.goto("about:blank");
+  await page.goto("/#/sources");
+  await expect(
+    page.getByRole("heading", { name: "暂无信息来源" }),
+  ).toBeVisible();
+  await expect(page.locator(".source-table")).toHaveCount(0);
+  await page.unroute("**/api/sources");
 });

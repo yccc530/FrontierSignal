@@ -7,8 +7,10 @@ from .models import Article, ArticleLink, Repository, StarSnapshot
 from .momentum import project_momentum
 from .normalizer import canonical_url
 from .projects import parse_time, star_growth
+from .recommendation_state import exposure_state, load_policy
 from .schemas import ArticleOut
-from .technical import TOPICS
+from .similarity import distinct_model_ids
+from .topics import public_topics
 
 
 def recency(value: datetime | None, at: datetime, half_life_hours: float) -> float:
@@ -21,7 +23,12 @@ def recency(value: datetime | None, at: datetime, half_life_hours: float) -> flo
 def activity_time(article):
     if article.source.kind in {"hf_models", "hf_datasets"}:
         try:
-            return parse_time(article.metrics.get("updated_at")) or article.published_at
+            model = article.metrics.get("model") or {}
+            return (
+                parse_time(model.get("hub_updated_at") or article.metrics.get("updated_at"))
+                or parse_time(model.get("hub_created_at"))
+                or article.published_at
+            )
         except (ValueError, TypeError):
             pass
     return article.published_at
@@ -125,7 +132,6 @@ def article_rank(article, at, interests, include_heat=True):
         activity_time(article), at, 24 if article.source.kind == "hackernews" else 7 * 24
     )
     score += 15 * fresh
-    score += 5 * recency(article.collected_at, at, 7 * 24)
     if set(article.technical_topics) & set(interests):
         score += 5
         reasons.append("匹配当前研究偏好")
@@ -140,6 +146,8 @@ def article_rank(article, at, interests, include_heat=True):
     elif article.source.kind in {"github", "github_discovery", "hf_models", "hf_datasets"}:
         score += 6
         reasons.append("可追溯的代码、模型或数据资源")
+    if article.source.kind == "hf_models":
+        reasons.append("依据 Hub 仓库更新时间，非官方模型发布日期；热度不证明性能")
     if include_heat and article.source.kind == "hackernews":
         points = article.metrics.get("points")
         comments = article.metrics.get("comments_count")
@@ -157,6 +165,7 @@ def article_rank(article, at, interests, include_heat=True):
 
 
 async def recommendation_dashboard(session, at, interests, topic=None):
+    policy = await load_policy(session)
     projects, project_truncated = await ranked_projects(session, at, interests, topic)
     project_selection = [p for p in projects if p["momentum"]["is_rising"]][:6]
     selected_ids = {p["id"] for p in project_selection}
@@ -187,7 +196,15 @@ async def recommendation_dashboard(session, at, interests, topic=None):
         row
         for row in rows[:1000]
         if (not topic or topic in row.technical_topics)
-        and row.metrics.get("kind") != "repository"
+        and (
+            row.metrics.get("kind") != "repository"
+            or row.id
+            in {
+                p["article_id"]
+                for p in projects
+                if p["momentum"]["is_new"] or p["momentum"]["is_rising"]
+            }
+        )
         and activity_time(row) is not None
         and at - timedelta(days=30) <= activity_time(row) <= at + timedelta(minutes=5)
     ]
@@ -198,7 +215,15 @@ async def recommendation_dashboard(session, at, interests, topic=None):
                 select(ArticleLink).where(
                     ArticleLink.left_id.in_(rows_by_id),
                     ArticleLink.right_id.in_(rows_by_id),
-                    ArticleLink.method.in_(["same_url", "same_content", "title_similarity"]),
+                    ArticleLink.method.in_(
+                        [
+                            "same_url",
+                            "same_content",
+                            "title_similarity",
+                            "model_reference",
+                            "paper_reference",
+                        ]
+                    ),
                     ArticleLink.similarity >= 0.96,
                 )
             )
@@ -208,23 +233,56 @@ async def recommendation_dashboard(session, at, interests, topic=None):
     )
     neighbors = {}
     for link in links:
+        if distinct_model_ids(rows_by_id[link.left_id], rows_by_id[link.right_id]):
+            continue
         neighbors.setdefault(link.left_id, set()).add(link.right_id)
         neighbors.setdefault(link.right_id, set()).add(link.left_id)
     seen = {p["article_id"] for p in project_selection + emerging}
     urls = {canonical_url(p["url"]) for p in project_selection + emerging}
+    model_ids = set()
+    exposures = await exposure_state(session, rows, at, policy.repeat_hours)
+    topic_counts = {}
 
     def choose(candidates, limit=6, heat=True):
-        ranked = sorted(
-            candidates, key=lambda row: (-article_rank(row, at, interests, heat)[0], row.id)
-        )
+        if limit <= 0:
+            return []
+
+        def fair_key(row):
+            model_topics = (row.metrics.get("model") or {}).get("topics", [])
+            explicit = [key for key in row.technical_topics if key in policy.topic_weights]
+            topics = (
+                [topic] if topic else explicit or model_topics or row.technical_topics or ["other"]
+            )
+            focus = min(
+                topics,
+                key=lambda key: (topic_counts.get(key, 0) / policy.topic_weights.get(key, 1), key),
+            )
+            return (
+                exposures[row.id]["recent"],
+                topic_counts.get(focus, 0) / policy.topic_weights.get(focus, 1),
+                -article_rank(row, at, interests, heat)[0],
+                row.id,
+            ), focus
+
+        ranked = list(candidates)
         selected = []
-        for row in ranked:
+        while ranked:
+            row = min(ranked, key=lambda row: fair_key(row)[0])
+            ranked.remove(row)
             url = canonical_url(row.original_url)
+            model_id = (row.metrics.get("model") or {}).get("id")
+            model_id = model_id.casefold() if isinstance(model_id, str) else None
             if row.id in seen or (url and url in urls) or neighbors.get(row.id, set()) & seen:
                 continue
+            if model_id and model_id in model_ids:
+                continue
             seen.add(row.id)
+            focus = fair_key(row)[1]
+            topic_counts[focus] = topic_counts.get(focus, 0) + 1
             if url:
                 urls.add(url)
+            if model_id:
+                model_ids.add(model_id)
             score, reasons = article_rank(row, at, interests, heat)
             selected.append(
                 {
@@ -232,6 +290,7 @@ async def recommendation_dashboard(session, at, interests, topic=None):
                     "recommendation_score": score,
                     "reasons": reasons,
                     "related_count": len(neighbors.get(row.id, set())),
+                    "exposure": exposures[row.id],
                 }
             )
             if len(selected) >= limit:
@@ -245,13 +304,16 @@ async def recommendation_dashboard(session, at, interests, topic=None):
         and row.published_at
         and row.published_at >= at - timedelta(hours=72)
     ]
-    hot = choose(hn, limit=4)
+    hot_limit = policy.section_limits["hot"]
+    hot = choose(hn, limit=max(0, hot_limit - min(2, hot_limit)))
     fresh = choose(
-        [row for row in hn if row.published_at >= at - timedelta(hours=12)], limit=2, heat=False
+        [row for row in hn if row.published_at >= at - timedelta(hours=12)],
+        limit=min(2, hot_limit),
+        heat=False,
     )
     hot += fresh
-    if len(hot) < 6:
-        hot += choose(hn, limit=6 - len(hot))
+    if len(hot) < hot_limit:
+        hot += choose(hn, limit=hot_limit - len(hot))
     papers = choose(
         [
             row
@@ -259,17 +321,64 @@ async def recommendation_dashboard(session, at, interests, topic=None):
             if row.source.kind == "arxiv"
             and row.published_at
             and row.published_at >= at - timedelta(days=14)
-        ]
+        ],
+        limit=policy.section_limits["papers"],
     )
-    official = choose([row for row in rows if row.source.trust == "official"])
-    discoveries = choose(rows, heat=False)
+    models = choose(
+        [row for row in rows if row.metrics.get("kind") in {"model", "model_release"}],
+        limit=policy.section_limits["models"],
+        heat=False,
+    )
+    tools = choose(
+        [
+            row
+            for row in rows
+            if (row.metrics.get("resource") or {}).get("type")
+            in {"tool", "plugin", "framework", "client", "application"}
+        ],
+        limit=policy.section_limits["tools"],
+        heat=False,
+    )
+    workflows = choose(
+        [row for row in rows if (row.metrics.get("resource") or {}).get("type") == "workflow"],
+        limit=policy.section_limits["workflows"],
+        heat=False,
+    )
+    official = choose(
+        [row for row in rows if row.source.trust == "official"],
+        limit=policy.section_limits["official"],
+    )
+    discoveries = choose(
+        [row for row in rows if row.metrics.get("kind") != "repository"],
+        limit=policy.section_limits["discoveries"],
+        heat=False,
+    )
     return {
         "generated_at": at,
-        "topics": [{"id": key, "label": label} for key, (label, _) in TOPICS.items()],
+        "topics": public_topics(),
         "interests": interests,
+        "policy": policy.model_dump(),
         "projects": project_selection,
         "emerging_projects": emerging,
         "sections": [
+            {
+                "id": "models",
+                "title": "模型发布与更新",
+                "window": "近 30 天 · 区分官方发布与模型仓库更新",
+                "items": models,
+            },
+            {
+                "id": "tools",
+                "title": "开发工具与应用",
+                "window": "近 30 天 · 新项目与增长异动",
+                "items": tools,
+            },
+            {
+                "id": "workflows",
+                "title": "创作工作流",
+                "window": "近 30 天 · 原文依赖与运行说明",
+                "items": workflows,
+            },
             {
                 "id": "hot",
                 "title": "今日 AI 技术热点",
@@ -279,7 +388,7 @@ async def recommendation_dashboard(session, at, interests, topic=None):
             {
                 "id": "papers",
                 "title": "最新前沿论文",
-                "window": "近 14 天 · cs.AI / LG / CL / CV",
+                "window": "近 14 天 · AI、工程与科学研究",
                 "items": papers,
             },
             {

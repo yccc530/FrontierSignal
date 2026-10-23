@@ -14,6 +14,8 @@ import {
   kindNames,
 } from "../components/common";
 import { Switch } from "../components/ui/switch";
+import DiscoverySettings from "../components/DiscoverySettings";
+import CoverageMonitor from "../components/CoverageMonitor";
 import {
   Dialog,
   DialogContent,
@@ -115,6 +117,7 @@ export default function Sources() {
         </div>
       </section>
       <ErrorNotice error={sources.error || patch.error || collect.error} />
+      <CoverageMonitor />
       {collect.isSuccess && (
         <div className="notice" role="status">
           采集请求已提交，可在运行任务中查看结果。
@@ -123,6 +126,8 @@ export default function Sources() {
       <div className="content-band">
         {sources.isPending ? (
           <Empty title="正在读取来源" busy />
+        ) : sources.isError ? null : sources.data?.length === 0 ? (
+          <Empty title="暂无信息来源" detail="尚未配置订阅源或项目。" />
         ) : (
           <div className="table-scroll">
             <table className="data-table source-table">
@@ -151,6 +156,9 @@ export default function Sources() {
                         </div>
                       </div>
                       <p className="source-url">{source.url}</p>
+                      {!!source.discovery_topics?.length && (
+                        <DiscoverySettings key={source.id} source={source} />
+                      )}
                       {source.last_error && (
                         <p className="source-error">
                           {displayError(source.last_error)}

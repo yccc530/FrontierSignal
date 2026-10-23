@@ -13,7 +13,15 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { api, dateTime, type Article, type ArticlePage } from "../lib/api";
+import {
+  api,
+  articleTime,
+  dateTime,
+  type Article,
+  type ArticlePage,
+  type Topic,
+  type Publisher,
+} from "../lib/api";
 import {
   useAction,
   useCategories,
@@ -31,6 +39,8 @@ import {
 } from "../components/common";
 import ArticleDetail from "../components/ArticleDetail";
 import { Metrics } from "../components/Intelligence";
+import ModelFacts from "../components/ModelFacts";
+import ContentFacts from "../components/ContentFacts";
 
 export default function Feed({ favorite = false }: { favorite?: boolean }) {
   const [params, setParams] = useSearchParams();
@@ -40,6 +50,14 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   useEffect(() => setDraft(q), [q]);
   const sources = useSources();
+  const topics = useQuery({
+    queryKey: ["topics"],
+    queryFn: () => api<Topic[]>("/topics"),
+  });
+  const publishers = useQuery({
+    queryKey: ["publishers"],
+    queryFn: () => api<Publisher[]>("/publishers"),
+  });
   const categories = useCategories();
   const stats = useStats();
   const settings = useSettings();
@@ -130,7 +148,9 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
           collect.error ||
           analyze.error ||
           patch.error ||
-          sources.error
+          sources.error ||
+          topics.error ||
+          publishers.error
         }
       />
       {(collect.isSuccess || analyze.isSuccess) && (
@@ -198,6 +218,54 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
         >
           <SlidersHorizontal size={17} />
         </IconButton>
+      </div>
+      <div className="model-filter-toolbar">
+        <label>
+          内容
+          <select
+            aria-label="资讯内容类型"
+            value={params.get("content_type") || ""}
+            onChange={(event) => change("content_type", event.target.value)}
+          >
+            <option value="">全部资讯</option>
+            <option value="models">模型资讯</option>
+            <option value="tools">工具与应用</option>
+            <option value="projects">项目案例</option>
+            <option value="workflows">创作工作流</option>
+            <option value="papers">研究论文</option>
+            <option value="datasets">数据集</option>
+          </select>
+        </label>
+        <label>
+          主题
+          <select
+            aria-label="资讯技术主题"
+            value={params.get("topic") || ""}
+            onChange={(event) => change("topic", event.target.value)}
+          >
+            <option value="">全部技术方向</option>
+            {topics.data?.map((topic) => (
+              <option key={topic.id} value={topic.id}>
+                {topic.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          发布团队
+          <select
+            aria-label="模型发布团队"
+            value={params.get("publisher") || ""}
+            onChange={(event) => change("publisher", event.target.value)}
+          >
+            <option value="">全部团队 / 社区</option>
+            {publishers.data?.map((publisher) => (
+              <option key={publisher.id} value={publisher.id}>
+                {publisher.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {expanded && (
         <div className="filter-panel">
@@ -274,7 +342,7 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
           value={params.get("sort") || "published"}
           onChange={(e) => change("sort", e.target.value)}
         >
-          <option value="published">最新发布</option>
+          <option value="published">最新发布 / 收录</option>
           <option value="score">重要性优先</option>
           <option value="technical">技术相关性</option>
         </select>
@@ -311,11 +379,7 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
                 />
                 <span>{sourceLabel(article.source.name)}</span>
                 <span className="meta-dot">·</span>
-                <time>
-                  {article.published_at
-                    ? dateTime(article.published_at)
-                    : `采集 ${dateTime(article.collected_at)}`}
-                </time>
+                <time>{articleTime(article)}</time>
                 {!article.is_read && (
                   <span className="unread-dot" aria-label="未读" />
                 )}
@@ -327,6 +391,8 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
                 {article.summary_zh || "中文摘要尚未生成，来源原文已保留。"}
               </p>
               <Metrics article={article} />
+              <ModelFacts article={article} />
+              <ContentFacts article={article} />
               <div className="article-footer">
                 <div className="tag-list">
                   {article.category ? (

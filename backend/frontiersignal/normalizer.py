@@ -58,6 +58,7 @@ class RawItem:
     metrics: dict = field(default_factory=dict)
     repository: dict | None = None
     identity_url: str | None = None
+    preserve_existing_content: bool = False
 
 
 def normalize(item: RawItem) -> dict:

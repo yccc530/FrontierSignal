@@ -191,6 +191,14 @@ async def test_github_search_quality_and_release_collection_uses_official_api():
                 return {"items": [repo_payload()], "incomplete_results": False}
             if "/contents" in url:
                 return [{"type": "file", "name": "train.py"}]
+            if "/readme" in url:
+                import base64
+
+                return {
+                    "sha": "a" * 40,
+                    "encoding": "base64",
+                    "content": base64.b64encode(b"Open neural training implementation").decode(),
+                }
             if "/stargazers/history" in url:
                 return []
             if "/releases" in url:

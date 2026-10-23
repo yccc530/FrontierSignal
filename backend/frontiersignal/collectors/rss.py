@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import feedparser
 
+from ..model_info import annotate_official_model
 from ..models import Source
 from ..network import Fetcher
 from ..normalizer import RawItem
@@ -39,6 +40,11 @@ def parse_entries(data: bytes, limit: int) -> list[RawItem]:
                 published_at=published,
                 raw=dict(entry),
                 metrics={
+                    "feed_time_kind": "published"
+                    if entry.get("published_parsed")
+                    else "updated"
+                    if entry.get("updated_parsed")
+                    else "unknown",
                     "authors": [
                         author.get("name")
                         for author in entry.get("authors", [])
@@ -68,6 +74,8 @@ class RSSCollector:
             return Collection([], source.cursor)
         # Feed parser is bounded by the network response limit.
         items = await asyncio.to_thread(parse_entries, data, self.fetcher.settings.max_items)
+        for item in items:
+            annotate_official_model(item, source)
         lowered = {k.lower(): v for k, v in response_headers.items()}
         return Collection(
             items, {"etag": lowered.get("etag"), "modified": lowered.get("last-modified")}

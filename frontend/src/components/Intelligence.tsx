@@ -107,7 +107,15 @@ export function ProjectItem({
           className="project-name"
           onClick={() => onOpen(project.article_id)}
         >
-          {project.name}
+          {project.name.includes("/") ? (
+            <>
+              {project.name.slice(0, project.name.indexOf("/") + 1)}
+              <wbr />
+              {project.name.slice(project.name.indexOf("/") + 1)}
+            </>
+          ) : (
+            project.name
+          )}
         </button>
         <a
           href={project.url}

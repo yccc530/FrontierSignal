@@ -59,6 +59,16 @@ class Source(Base):
     def automatic(self) -> bool:
         return (self.config or {}).get("automatic", True)
 
+    @property
+    def discovery_topics(self) -> list[str]:
+        from .topics import selected_topics
+
+        return selected_topics(self)
+
+    @property
+    def discovery_scope_customized(self) -> bool:
+        return "discovery_topics" in (self.config or {})
+
 
 class Article(Base):
     __tablename__ = "articles"
@@ -119,6 +129,7 @@ class RawRecord(Base):
 
 class TaskRun(Base):
     __tablename__ = "task_runs"
+    __table_args__ = (Index("ix_task_source_created", "source_id", "created_at"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     source_id: Mapped[str | None] = mapped_column(ForeignKey("sources.id"))
     kind: Mapped[str] = mapped_column(String(30), default="collect")
@@ -217,3 +228,26 @@ class StarSnapshot(Base):
     observed_at: Mapped[datetime] = mapped_column(UTCDateTime)
     stars: Mapped[int] = mapped_column(Integer)
     forks: Mapped[int] = mapped_column(Integer)
+
+
+class WorkbenchState(Base):
+    __tablename__ = "workbench_state"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class RecommendationView(Base):
+    __tablename__ = "recommendation_views"
+    article_id: Mapped[str] = mapped_column(ForeignKey("articles.id"), primary_key=True)
+    revision_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    first_shown_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    last_shown_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
+    count: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class RuntimeSample(Base):
+    __tablename__ = "runtime_samples"
+    slot: Mapped[datetime] = mapped_column(UTCDateTime, primary_key=True)
+    observed_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    scheduler_enabled: Mapped[bool] = mapped_column(Boolean)
+    active_tasks: Mapped[int] = mapped_column(Integer)

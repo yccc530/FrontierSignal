@@ -1,24 +1,18 @@
+import base64
 import re
 from datetime import timedelta
 from html import escape
 from urllib.parse import urlencode, urlsplit
 
+from ..discovery_state import record_scan
 from ..models import now
 from ..network import FetchError
 from ..normalizer import RawItem
 from ..projects import normalize_star_history, parse_time
+from ..topics import CATALOG, collection_topics, selected_topics
 from .base import Collection
 
-QUERIES = [
-    "topic:llm",
-    '"AI agent" in:name,description',
-    "topic:inference",
-    "topic:fine-tuning",
-    "topic:rag",
-    "topic:multimodal",
-    "topic:machine-learning",
-    "topic:ai-framework",
-]
+QUERIES = [CATALOG[key].github_query for key in collection_topics("github_discovery")]
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 CODE_EXTENSIONS = (
     ".py",
@@ -36,9 +30,19 @@ CODE_EXTENSIONS = (
 )
 
 
-def discovery_search(tick, at, per_page):
-    topic = QUERIES[tick % len(QUERIES)]
-    lane = (tick + tick // len(QUERIES)) % 4
+def topic_queries(topics, tick):
+    cycle = tick // len(topics)
+    queries = []
+    for key in topics:
+        variants = [CATALOG[key].github_query, *CATALOG[key].github_alternates]
+        queries.append(variants[cycle % len(variants)])
+    return queries
+
+
+def discovery_search(tick, at, per_page, queries=None):
+    queries = QUERIES if queries is None else queries
+    topic = queries[tick % len(queries)]
+    lane = (tick + tick // len(queries)) % 4
 
     def date(days):
         return (at - timedelta(days=days)).date().isoformat()
@@ -55,7 +59,7 @@ def discovery_search(tick, at, per_page):
         "sort": sort,
         "order": "desc",
         "per_page": per_page,
-        "page": 1 + tick // (len(QUERIES) * 4) % 3,
+        "page": 1 + tick // (len(queries) * 4) % 3,
     }, lane_name
 
 
@@ -76,6 +80,7 @@ class GitHubDiscoveryCollector:
     def __init__(self, fetcher):
         self.fetcher = fetcher
         self.targets: list[dict] = []
+        self.known_resources: dict[str, dict] = {}
 
     async def collect(self, source):
         config = self.fetcher.settings
@@ -84,8 +89,17 @@ class GitHubDiscoveryCollector:
         tick = int(cursor.get("discovery_tick", 0)) if cursor.get("strategy") == 2 else 0
         result = Collection([], advance_on_partial=True)
         observations = {}
-        for step in range(config.github_queries_per_run):
-            params, lane = discovery_search(tick + step, now(), config.github_candidates_per_query)
+        topics = selected_topics(source, "github_discovery")
+        scans = dict(cursor.get("scans", {}))
+        steps = min(config.github_queries_per_run, len(topics))
+        for step in range(steps):
+            topic = topics[(tick + step) % len(topics)]
+            params, lane = discovery_search(
+                tick + step,
+                now(),
+                config.github_candidates_per_query,
+                topic_queries(topics, tick + step),
+            )
             try:
                 payload = await self.fetcher.json(
                     "https://api.github.com/search/repositories?" + urlencode(params), headers
@@ -94,14 +108,27 @@ class GitHubDiscoveryCollector:
                     raise ValueError("Invalid GitHub repository search response")
                 if payload.get("incomplete_results"):
                     result.errors.append("GitHub 搜索返回不完整结果，未宣称覆盖全部项目")
+                record_scan(
+                    scans,
+                    topic,
+                    label=CATALOG[topic].label,
+                    topics=[topic],
+                    count=len(payload["items"]),
+                    error="GitHub 搜索结果不完整" if payload.get("incomplete_results") else None,
+                    partial=True,
+                )
+                scans[topic]["query"] = params["q"]
                 for repo in payload["items"]:
                     self._remember(observations, repo)
                     observations[str(repo["id"])].setdefault("discovery_queries", []).append(
                         params["q"]
                     )
                     observations[str(repo["id"])].setdefault("discovery_lanes", []).append(lane)
+                    observations[str(repo["id"])].setdefault("discovery_groups", []).append(topic)
             except Exception as exc:
-                result.errors.append(error_message(exc, "项目搜索"))
+                error = error_message(exc, "项目搜索")
+                result.errors.append(error)
+                record_scan(scans, topic, label=CATALOG[topic].label, topics=[topic], error=error)
         targets = list(self.targets)
         if not targets:
             targets = [
@@ -210,6 +237,45 @@ class GitHubDiscoveryCollector:
                 )
             except Exception as exc:
                 result.errors.append(error_message(exc, f"代码核验 {name}"))
+        readme_budget = config.github_readme_checks
+        for observation in observations.values():
+            repo = observation["repository"]
+            previous = self.known_resources.get(repo["full_name"], {})
+            resource = dict(previous)
+            observation["resource"] = resource
+            if previous.get("readme_sha") and previous.get("pushed_at") == repo.get("pushed_at"):
+                resource["readme_status"] = "cached"
+                continue
+            resource["readme_status"] = "stale" if previous.get("readme_sha") else "not_fetched"
+            if readme_budget <= 0:
+                continue
+            readme_budget -= 1
+            try:
+                readme = await self.fetcher.json(
+                    f"https://api.github.com/repos/{repo['full_name']}/readme", headers
+                )
+                if readme.get("encoding") != "base64" or not re.fullmatch(
+                    r"[0-9a-f]{40}", readme.get("sha", "")
+                ):
+                    raise ValueError("Invalid README metadata")
+                content = base64.b64decode(readme["content"]).decode("utf-8", errors="replace")
+                observation["readme"] = content[:24000]
+                resource.update(
+                    {
+                        "readme_sha": readme["sha"],
+                        "pushed_at": repo.get("pushed_at"),
+                        "readme_status": "available",
+                        "readme_truncated": len(content) > 24000,
+                        "source_url": f"https://api.github.com/repos/{repo['full_name']}/git/blobs/{readme['sha']}",
+                    }
+                )
+            except FetchError as exc:
+                if exc.status != 404:
+                    result.errors.append(error_message(exc, f"README {repo['full_name']}"))
+                resource["readme_status"] = "unavailable"
+            except Exception as exc:
+                result.errors.append(error_message(exc, f"README {repo['full_name']}"))
+                resource["readme_status"] = "unavailable"
         repository_items = []
         for observation in observations.values():
             repo = observation["repository"]
@@ -220,6 +286,7 @@ class GitHubDiscoveryCollector:
                         repo.get("description"),
                         "Topics: " + ", ".join(repo.get("topics") or []),
                         "Language: " + (repo.get("language") or "unknown"),
+                        observation.get("readme"),
                     ],
                 )
             )
@@ -232,8 +299,10 @@ class GitHubDiscoveryCollector:
                     author=(repo.get("owner") or {}).get("login"),
                     published_at=parse_time(repo.get("created_at")),
                     raw=observation,
+                    preserve_existing_content="readme" not in observation,
                     metrics={
                         "kind": "repository",
+                        "discovery_groups": observation.get("discovery_groups", []),
                         "stars": repo["stargazers_count"],
                         "forks": repo.get("forks_count", 0),
                         "topics": repo.get("topics", []),
@@ -242,6 +311,8 @@ class GitHubDiscoveryCollector:
                         "fork": repo.get("fork", False),
                         "observed_at": observation["observed_at"],
                         "pushed_at": repo.get("pushed_at"),
+                        "resource": observation["resource"],
+                        "has_code": observation.get("has_code"),
                     },
                     repository=observation,
                 )
@@ -249,7 +320,12 @@ class GitHubDiscoveryCollector:
         result.items = repository_items + result.items
         result.cursor = {
             "strategy": 2,
-            "discovery_tick": tick + config.github_queries_per_run,
+            "discovery_tick": tick + steps,
+            "scans": {
+                key: value
+                for key, value in scans.items()
+                if key in collection_topics("github_discovery")
+            },
         }
         return result
 

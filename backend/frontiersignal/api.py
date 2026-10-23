@@ -2,12 +2,14 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from sqlalchemy import func, select, text
+from sqlalchemy import Text, cast, func, select, text
 
 from .collectors import COLLECTORS
 from .models import AnalysisAttempt, Article, ArticleLink, RawRecord, Source, TaskRun
+from .publishers import PUBLISHERS
 from .queries import article_query
 from .schemas import ArticleOut, ArticlePage, SourceOut, SourcePatch, TaskOut
+from .topics import TOPICS, collection_topics
 
 router = APIRouter(prefix="/api")
 
@@ -55,6 +57,26 @@ async def update_source(source_id: str, patch: SourcePatch, request: Request):
         if source.kind not in COLLECTORS:
             raise HTTPException(409, "该平台当前未接入")
         values = patch.model_dump(exclude_none=True)
+        if "discovery_topics" in patch.model_fields_set:
+            selected = patch.discovery_topics
+            available = collection_topics(source.kind)
+            if source.kind == "arxiv" and not source.config.get("research_queries"):
+                available = []
+            if not available or (
+                selected is not None
+                and (
+                    len(set(selected)) != len(selected)
+                    or any(key not in available for key in selected)
+                )
+            ):
+                raise HTTPException(422, "该来源不支持所选采集方向")
+            config = dict(source.config)
+            if selected is None:
+                config.pop("discovery_topics", None)
+            else:
+                config["discovery_topics"] = selected
+            source.config = config
+            values.pop("discovery_topics", None)
         if "automatic" in values:
             source.config = {**source.config, "automatic": values.pop("automatic")}
         for key, value in values.items():
@@ -102,6 +124,10 @@ async def articles(
     status: Literal["pending", "processing", "analyzed", "filtered", "failed"] | None = None,
     sort: Literal["published", "score", "technical"] = "published",
     technical: bool | None = None,
+    topic: str | None = None,
+    content_type: Literal["models", "tools", "projects", "workflows", "papers", "datasets"]
+    | None = None,
+    publisher: str | None = None,
     after: datetime | None = None,
     before: datetime | None = None,
 ):
@@ -109,6 +135,10 @@ async def articles(
     before = before.replace(tzinfo=UTC) if before and before.tzinfo is None else before
     if after and before and after >= before:
         raise HTTPException(422, "开始时间必须早于结束时间")
+    if topic and topic not in TOPICS:
+        raise HTTPException(422, "未知技术主题")
+    if publisher and publisher not in PUBLISHERS:
+        raise HTTPException(422, "未知发布团队")
     async with request.app.state.db.sessions() as session:
         query = article_query(
             q,
@@ -123,6 +153,25 @@ async def articles(
         )
         if technical is not None:
             query = query.where(Article.technical_eligible.is_(technical))
+        if topic:
+            query = query.where(
+                cast(Article.technical_topics, Text).contains(f'"{topic}"', autoescape=True)
+            )
+        if content_type == "models":
+            query = query.where(Article.metrics["kind"].as_string().in_(["model", "model_release"]))
+        elif content_type in {"tools", "projects", "workflows"}:
+            types = {
+                "tools": ["tool", "plugin", "framework", "client", "application"],
+                "projects": ["project"],
+                "workflows": ["workflow"],
+            }[content_type]
+            query = query.where(Article.metrics["resource"]["type"].as_string().in_(types))
+        elif content_type == "papers":
+            query = query.where(Article.source.has(kind="arxiv"))
+        elif content_type == "datasets":
+            query = query.where(Article.metrics["kind"].as_string() == "dataset")
+        if publisher:
+            query = query.where(Article.metrics["model"]["publisher_id"].as_string() == publisher)
         total = await session.scalar(select(func.count()).select_from(query.subquery()))
         ordering = [func.coalesce(Article.published_at, Article.collected_at).desc(), Article.id]
         if sort == "score":

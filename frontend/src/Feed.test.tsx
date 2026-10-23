@@ -81,6 +81,8 @@ beforeEach(() => {
         };
       else if (url.pathname === "/api/sources") value = [source];
       else if (url.pathname === "/api/categories") value = [];
+      else if (["/api/topics", "/api/publishers"].includes(url.pathname))
+        value = [];
       else if (url.pathname === "/api/settings")
         value = { llm_configured: false };
       else if (url.pathname === "/api/stats")

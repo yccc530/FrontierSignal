@@ -8,10 +8,13 @@ from sqlalchemy import select, text, update
 from .analysis import AnalysisPipeline
 from .collectors import COLLECTORS
 from .collectors.github_discovery import GitHubDiscoveryCollector
+from .collectors.huggingface import HuggingFaceCollector
 from .config import Settings
 from .db import Database
+from .discovery_state import record_outcome
 from .models import AnalysisAttempt, Article, Repository, Source, TaskRun, now
 from .network import Fetcher
+from .observability import record_runtime_sample
 from .projects import tracking_targets
 from .similarity import link_related
 from .storage import ingest
@@ -82,6 +85,7 @@ class TaskManager:
                 )
             )
             await session.commit()
+        await record_runtime_sample(self.db, self.settings)
         if self.settings.scheduler_enabled:
             self.scheduler.add_job(
                 self.tick,
@@ -113,6 +117,7 @@ class TaskManager:
             await self.ensure_owner()
         except ValueError:
             return
+        await record_runtime_sample(self.db, self.settings)
         async with self.db.sessions() as session:
             sources = (await session.scalars(select(Source).where(Source.enabled.is_(True)))).all()
         for source in sources:
@@ -172,7 +177,31 @@ class TaskManager:
                     if not collector_type:
                         raise ValueError(f"Unsupported collector: {source.kind}")
                     collector = collector_type(self.fetcher)
+                    if isinstance(collector, HuggingFaceCollector) and source.kind == "hf_models":
+                        cached = (
+                            await session.execute(
+                                select(Article.platform_id, Article.metrics)
+                                .where(Article.source_id == source.id)
+                                .order_by(Article.collected_at.desc())
+                                .limit(2000)
+                            )
+                        ).all()
+                        collector.known_cards = {
+                            identifier: (metrics or {}).get("model", {})
+                            for identifier, metrics in cached
+                        }
                     if isinstance(collector, GitHubDiscoveryCollector):
+                        cached = (
+                            await session.execute(
+                                select(Article.title, Article.metrics)
+                                .where(Article.source_id == source.id)
+                                .order_by(Article.updated_at.desc())
+                                .limit(2000)
+                            )
+                        ).all()
+                        collector.known_resources = {
+                            title: (metrics or {}).get("resource", {}) for title, metrics in cached
+                        }
                         collector.targets = await tracking_targets(
                             session, self.settings.github_track_per_run
                         )
@@ -187,13 +216,21 @@ class TaskManager:
                         try:
                             async with session.begin_nested():
                                 article, outcome = await ingest(session, source, item)
-                                if outcome != "duplicates":
+                                if outcome != "duplicates" or item.metrics.get("model"):
                                     await link_related(session, article)
                             setattr(run, outcome, getattr(run, outcome) + 1)
+                            record_outcome(
+                                collection.cursor, item.metrics.get("discovery_groups", []), outcome
+                            )
                             if outcome in {"added", "updated"} and not article.technical_eligible:
                                 run.filtered += 1
                         except Exception as exc:
                             run.failed += 1
+                            record_outcome(
+                                collection.cursor,
+                                item.metrics.get("discovery_groups", []),
+                                "failed",
+                            )
                             errors.append(f"Entry rejected ({type(exc).__name__})")
                         # Each accepted original survives later network/analysis failures.
                         await session.commit()

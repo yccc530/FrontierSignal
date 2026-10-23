@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Bookmark, CheckCheck, RefreshCw } from "lucide-react";
-import { api, dateTime, type ArticleDetail as Detail } from "../lib/api";
+import {
+  api,
+  articleTime,
+  dateTime,
+  type ArticleDetail as Detail,
+} from "../lib/api";
+import ModelFacts from "./ModelFacts";
+import ContentFacts from "./ContentFacts";
 import { displayError } from "../lib/messages";
 import { useAction, useCategories, useSettings } from "../lib/hooks";
 import { Metrics } from "./Intelligence";
@@ -27,6 +34,9 @@ const relationNames: Record<string, string> = {
   title_similarity: "标题相近",
   simhash: "正文相近",
   embedding: "语义相近",
+  model_reference: "明确模型引用",
+  paper_reference: "明确论文引用",
+  resource_reference: "代码或数据集引用",
 };
 export default function ArticleDetail({
   id,
@@ -85,7 +95,7 @@ export default function ArticleDetail({
                   kind={article.source.kind}
                 />
                 <span>{trustNames[article.source.trust]}</span>
-                <span>发布 {dateTime(article.published_at)}</span>
+                <span>{articleTime(article)}</span>
                 <Status value={article.status} />
               </div>
               <div className="detail-actions">
@@ -143,12 +153,14 @@ export default function ArticleDetail({
                 )}
               </div>
               <Metrics article={article} />
+              <ModelFacts article={article} detailed />
+              <ContentFacts article={article} detailed />
               {article.metrics?.authors?.length ? (
                 <p className="paper-authors">
                   作者：{article.metrics.authors.join(", ")}
                 </p>
               ) : null}
-              {article.metrics?.updated_at && (
+              {article.metrics?.updated_at && !article.metrics.model && (
                 <p className="paper-authors">
                   资源更新 {dateTime(article.metrics.updated_at)}
                 </p>

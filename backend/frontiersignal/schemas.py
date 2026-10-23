@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .topics import TOPICS
+
 
 class SourceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -17,6 +19,8 @@ class SourceOut(BaseModel):
     last_success_at: datetime | None
     last_status: str
     last_error: str | None
+    discovery_topics: list[str]
+    discovery_scope_customized: bool
 
 
 class SourcePatch(BaseModel):
@@ -24,6 +28,7 @@ class SourcePatch(BaseModel):
     enabled: bool | None = None
     automatic: bool | None = None
     interval_minutes: int | None = Field(None, ge=15, le=10080)
+    discovery_topics: list[str] | None = Field(None, min_length=1, max_length=len(TOPICS))
 
 
 class ArticleOut(BaseModel):

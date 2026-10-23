@@ -5,6 +5,8 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .topics import LEGACY_TOPICS
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -47,19 +49,14 @@ class Settings(BaseSettings):
     github_candidates_per_query: int = Field(10, ge=1, le=30)
     github_track_per_run: int = Field(10, ge=1, le=15)
     github_code_checks: int = Field(3, ge=0, le=10)
+    github_readme_checks: int = Field(2, ge=0, le=5)
     github_history_checks: int = Field(8, ge=0, le=15)
+    hf_queries_per_run: int = Field(6, ge=1, le=6)
+    hf_candidates_per_query: int = Field(5, ge=1, le=10)
+    hf_card_checks: int = Field(6, ge=0, le=15)
     hn_candidates: int = Field(60, ge=10, le=150)
     hn_comment_limit: int = Field(3, ge=0, le=10)
-    interest_topics: list[str] = [
-        "llm",
-        "agents",
-        "inference",
-        "training",
-        "rag",
-        "multimodal",
-        "evaluation",
-        "frameworks",
-    ]
+    interest_topics: list[str] = Field(default_factory=lambda: list(LEGACY_TOPICS))
 
     @field_validator("llm_base_url")
     @classmethod

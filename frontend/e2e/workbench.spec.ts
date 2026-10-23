@@ -194,7 +194,7 @@ test("sources persist enabled state and expose task history", async ({
   }
 });
 
-test("settings show real configuration and save non-secret settings", async ({
+test("settings preserve configuration and report save or active-task rejection", async ({
   page,
   request,
 }, info) => {
@@ -205,8 +205,31 @@ test("settings show real configuration and save non-secret settings", async ({
   );
   if (!settings.llm_configured)
     await expect(page.getByRole("button", { name: "验证接口" })).toBeDisabled();
+  const saving = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/settings" &&
+      response.request().method() === "PATCH",
+  );
   await page.getByRole("button", { name: "保存配置" }).click();
-  await expect(page.getByRole("status")).toContainText("配置已保存");
+  const response = await saving;
+  const submitted = response.request().postDataJSON();
+  expect(submitted).not.toHaveProperty("llm_api_key");
+  expect(settings).toMatchObject(submitted);
+  if (response.status() === 409) {
+    // The live scheduler may be analyzing while this read/write UI check runs.
+    expect(await response.json()).toEqual({
+      detail: "分析任务运行时不能修改模型配置",
+    });
+    await expect(page.getByRole("alert")).toHaveText(
+      "分析任务运行时不能修改模型配置",
+    );
+    await expect(page.getByRole("status")).toHaveCount(0);
+  } else {
+    expect(response.status()).toBe(200);
+    await expect(page.getByRole("status")).toContainText("配置已保存");
+  }
+  const persisted = await (await request.get("/api/settings")).json();
+  expect(persisted).toMatchObject(submitted);
   await page.screenshot({
     path: `../.runtime/${info.project.name}-settings.png`,
   });

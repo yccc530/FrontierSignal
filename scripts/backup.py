@@ -27,6 +27,9 @@ TABLES = [
     "article_embeddings",
     "repositories",
     "star_snapshots",
+    "workbench_state",
+    "recommendation_views",
+    "runtime_samples",
 ]
 URL = make_url(settings.database_url.get_secret_value())
 

@@ -4,6 +4,7 @@ import json
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .content_info import content_metadata
 from .models import Article, RawRecord, Source, now
 from .normalizer import RawItem, digest, normalize
 from .projects import store_repository
@@ -15,7 +16,7 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
     conditions = [Article.identity_key == values["identity_key"]]
     if values["canonical_url"]:
         conditions.append(Article.canonical_url == values["canonical_url"])
-    if len(values["body"]) >= 80 and source.kind != "hackernews":
+    if len(values["body"]) >= 80 and source.kind not in {"hackernews", "hf_models", "hf_datasets"}:
         conditions.append(Article.content_hash == values["content_hash"])
     article = await session.scalar(
         select(Article)
@@ -28,7 +29,7 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
         session.add(article)
         await session.flush()
         outcome = "added"
-    elif article.content_hash != values["content_hash"]:
+    elif article.content_hash != values["content_hash"] and not item.preserve_existing_content:
         # Do not erase known metadata when an upstream item temporarily omits it.
         for key in ("title", "body", "author", "published_at"):
             if values[key] is not None:
@@ -49,10 +50,46 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
             if values[key] is not None and getattr(article, key) != values[key]:
                 setattr(article, key, values[key])
     if item.metrics:
+        if source.kind == "github_discovery" and item.preserve_existing_content:
+            item.metrics["resource"] = {
+                **(article.metrics or {}).get("resource", {}),
+                **item.metrics.get("resource", {}),
+            }
+            if item.metrics.get("has_code") is None:
+                item.metrics["has_code"] = (article.metrics or {}).get("has_code")
+        if (
+            source.kind == "hf_models"
+            and item.preserve_existing_content
+            and item.metrics.get("model")
+        ):
+            previous = (article.metrics or {}).get("model", {})
+            incoming = item.metrics["model"]
+            for key in (
+                "code_url",
+                "paper_url",
+                "card_revision",
+                "card_observed_at",
+                "card_truncated",
+                "specifications",
+            ):
+                if previous.get(key) is not None:
+                    incoming[key] = previous[key]
         updated_metrics = {**(article.metrics or {}), **item.metrics}
         if updated_metrics != article.metrics:
             article.updated_at = now()
         article.metrics = updated_metrics
+        if source.kind == "hf_models" and item.metrics.get("model"):
+            # Hub creation is not a model's announced release date, including legacy records.
+            article.published_at = None
+    article.metrics = content_metadata(
+        article.title,
+        article.body,
+        source.kind,
+        article.metrics,
+        article.original_url,
+        readme=item.raw.get("readme"),
+        reference_body=item.body if not item.preserve_existing_content else None,
+    )
     signal = technical_signal(
         article.title, article.body, source.kind, article.metrics, source.trust
     )
@@ -87,6 +124,15 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
 async def seed_sources(session: AsyncSession) -> None:
     defaults = [
         dict(
+            id="arxiv-research",
+            name="arXiv 专项工程与科学研究",
+            kind="arxiv",
+            url="https://export.arxiv.org/api/query",
+            trust="preprint",
+            interval_minutes=120,
+            config={"research_queries": True},
+        ),
+        dict(
             id="github-discovery",
             name="GitHub AI 项目发现",
             kind="github_discovery",
@@ -96,11 +142,11 @@ async def seed_sources(session: AsyncSession) -> None:
         ),
         dict(
             id="hf-models",
-            name="Hugging Face 热门模型",
+            name="Hugging Face 模型发现",
             kind="hf_models",
             url="https://huggingface.co/api/models",
             trust="community",
-            interval_minutes=360,
+            interval_minutes=60,
         ),
         dict(
             id="hf-datasets",
@@ -123,6 +169,7 @@ async def seed_sources(session: AsyncSession) -> None:
             kind="rss",
             url="https://openai.com/news/rss.xml",
             trust="official",
+            config={"publisher_id": "openai"},
         ),
         dict(
             id="deepmind",
@@ -130,6 +177,25 @@ async def seed_sources(session: AsyncSession) -> None:
             kind="rss",
             url="https://deepmind.google/blog/rss.xml",
             trust="official",
+            config={"publisher_id": "google"},
+        ),
+        dict(
+            id="google-ai",
+            name="Google AI 官方动态",
+            kind="rss",
+            url="https://blog.google/technology/ai/rss/",
+            trust="official",
+            config={"publisher_id": "google"},
+            interval_minutes=120,
+        ),
+        dict(
+            id="nvidia-technical",
+            name="NVIDIA 技术博客",
+            kind="rss",
+            url="https://developer.nvidia.com/blog/feed/",
+            trust="official",
+            config={"publisher_id": "nvidia"},
+            interval_minutes=120,
         ),
         dict(
             id="hackernews",
@@ -175,6 +241,14 @@ async def seed_sources(session: AsyncSession) -> None:
         for category in ["cs.LG", "cs.CL", "cs.CV"]
     )
     for value in defaults:
-        if not await session.get(Source, value["id"]):
+        existing = await session.get(Source, value["id"])
+        if not existing:
             session.add(Source(**value))
+        elif existing.url == value["url"] and value.get("config", {}).get("publisher_id"):
+            existing.config = {
+                "publisher_id": value["config"]["publisher_id"],
+                **(existing.config or {}),
+            }
+        elif existing.id == "hf-models" and existing.name == "Hugging Face 热门模型":
+            existing.name = value["name"]
     await session.commit()

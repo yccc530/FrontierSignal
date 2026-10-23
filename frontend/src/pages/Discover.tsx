@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import {
   api,
+  articleTime,
   dateTime,
   type Dashboard,
   type Project,
@@ -25,6 +26,9 @@ import {
   sourceLabel,
 } from "../components/common";
 import ArticleDetail from "../components/ArticleDetail";
+import ModelFacts from "../components/ModelFacts";
+import ContentFacts from "../components/ContentFacts";
+import RecommendationControls from "../components/RecommendationControls";
 import {
   Metrics,
   ProjectHistory,
@@ -68,35 +72,58 @@ function Interests({
           save.mutate({ path: "/preferences", body: { topics: selected } });
         }}
       >
-        <div className="interest-options">
-          {topics.map((topic) => (
-            <label key={topic.id}>
-              <input
-                type="checkbox"
-                checked={selected.includes(topic.id)}
-                onChange={(event) =>
-                  setSelected(
-                    event.target.checked
-                      ? [...selected, topic.id]
-                      : selected.filter((id) => id !== topic.id),
-                  )
-                }
-              />
-              {topic.label}
-            </label>
+        <div className="interest-groups">
+          {Array.from(
+            new Set(topics.map((topic) => topic.group || "技术方向")),
+          ).map((group) => (
+            <fieldset key={group}>
+              <legend>{group}</legend>
+              <div className="interest-options">
+                {topics
+                  .filter((topic) => (topic.group || "技术方向") === group)
+                  .map((topic) => (
+                    <label key={topic.id}>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(topic.id)}
+                        onChange={(event) =>
+                          setSelected(
+                            event.target.checked
+                              ? [...selected, topic.id]
+                              : selected.filter((id) => id !== topic.id),
+                          )
+                        }
+                      />
+                      {topic.label}
+                      {topic.discovery_ready === false && (
+                        <small>待专项接入</small>
+                      )}
+                    </label>
+                  ))}
+              </div>
+            </fieldset>
           ))}
         </div>
-        <button
-          className="secondary-button"
-          disabled={save.isPending || !selected.length}
-        >
-          <Save size={14} /> 保存偏好
-        </button>
-        {save.isSuccess && (
-          <span role="status" className="inline-notice">
-            偏好已保存
-          </span>
-        )}
+        <div className="form-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setSelected(topics.map((topic) => topic.id))}
+          >
+            全选方向
+          </button>
+          <button
+            className="secondary-button"
+            disabled={save.isPending || !selected.length}
+          >
+            <Save size={14} /> 保存偏好
+          </button>
+          {save.isSuccess && (
+            <span role="status" className="inline-notice">
+              偏好已保存
+            </span>
+          )}
+        </div>
         <ErrorNotice error={save.error} />
       </form>
     </details>
@@ -108,6 +135,8 @@ export default function Discover() {
   const topic = params.get("topic") || "";
   const [selected, setSelected] = useState<string | null>(null);
   const [history, setHistory] = useState<Project | null>(null);
+  const [exposureError, setExposureError] = useState<Error | null>(null);
+  const recorded = useRef(new Set<string>());
   const collect = useAction();
   const patch = useAction("PATCH");
   const sources = useSources();
@@ -117,9 +146,50 @@ export default function Discover() {
       api<Dashboard>(
         `/recommendations${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`,
       ),
-    refetchInterval: 15000,
+    refetchOnWindowFocus: false,
   });
   const data = dashboard.data;
+  useEffect(() => {
+    if (!data || typeof IntersectionObserver === "undefined") return;
+    const candidates = new Map(
+      data.sections
+        .flatMap((section) => section.items)
+        .map((item) => [item.article.id, item.exposure]),
+    );
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const items: { article_id: string; revision_hash: string }[] = [];
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).dataset.articleId;
+          const exposure = id ? candidates.get(id) : undefined;
+          if (!entry.isIntersecting || !id || !exposure) continue;
+          const key = `${id}:${exposure.revision_hash}`;
+          if (recorded.current.has(key)) continue;
+          recorded.current.add(key);
+          items.push({ article_id: id, revision_hash: exposure.revision_hash });
+        }
+        if (items.length)
+          void api("/recommendations/seen", {
+            method: "POST",
+            body: JSON.stringify({ items }),
+          })
+            .then(() => setExposureError(null))
+            .catch((error: Error) => {
+              items.forEach((item) =>
+                recorded.current.delete(
+                  `${item.article_id}:${item.revision_hash}`,
+                ),
+              );
+              setExposureError(error);
+            });
+      },
+      { threshold: 0.5 },
+    );
+    document
+      .querySelectorAll('[data-testid="recommendation-item"]')
+      .forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [data]);
   const open = (id: string) => {
     setSelected(id);
     patch.mutate({ path: `/articles/${id}`, body: { is_read: true } });
@@ -184,6 +254,8 @@ export default function Discover() {
             <span>更新于 {dateTime(data.generated_at)}</span>
           </div>
           <Interests topics={data.topics} initial={data.interests} />
+          <RecommendationControls topics={data.topics} />
+          <ErrorNotice error={exposureError} />
           {[
             {
               id: "rising",
@@ -235,86 +307,108 @@ export default function Discover() {
             </section>
           ))}
           <div className="recommend-section-grid">
-            {data.sections.map((section) => (
-              <section
-                className="recommend-section"
-                key={section.id}
-                aria-labelledby={`section-${section.id}`}
-              >
-                <div className="recommend-heading">
-                  <div>
-                    <h2 id={`section-${section.id}`}>{section.title}</h2>
-                    <span>{section.window}</span>
+            {data.sections
+              .filter(
+                (section) => data.policy?.section_limits[section.id] !== 0,
+              )
+              .map((section) => (
+                <section
+                  className="recommend-section"
+                  key={section.id}
+                  aria-labelledby={`section-${section.id}`}
+                >
+                  <div className="recommend-heading">
+                    <div>
+                      <h2 id={`section-${section.id}`}>{section.title}</h2>
+                      <span>{section.window}</span>
+                    </div>
+                    {section.id === "models" ? (
+                      <Link to="/feed?content_type=models">
+                        全部模型资讯 <ArrowRight size={14} />
+                      </Link>
+                    ) : (
+                      <span className="section-count">
+                        {section.items.length}
+                      </span>
+                    )}
                   </div>
-                  <span className="section-count">{section.items.length}</span>
-                </div>
-                {section.items.length ? (
-                  section.items.map((item) => (
-                    <article
-                      className="recommend-item"
-                      key={item.article.id}
-                      data-testid="recommendation-item"
-                      data-article-id={item.article.id}
-                    >
-                      <div className="recommend-meta">
-                        <SourceMark
-                          name={item.article.source.name}
-                          kind={item.article.source.kind}
-                        />
-                        <span>{sourceLabel(item.article.source.name)}</span>
-                        <time>{dateTime(item.article.published_at)}</time>
-                      </div>
-                      <button
-                        className="recommend-title"
-                        onClick={() => open(item.article.id)}
+                  {section.items.length ? (
+                    section.items.map((item) => (
+                      <article
+                        className="recommend-item"
+                        key={item.article.id}
+                        data-testid="recommendation-item"
+                        data-article-id={item.article.id}
                       >
-                        {item.article.title_zh ||
-                          item.article.title ||
-                          "无标题"}
-                      </button>
-                      <p className="recommend-summary">
-                        {item.article.summary_zh ||
-                          item.article.body.slice(0, 180) ||
-                          "原文未提供摘要"}
-                      </p>
-                      <Metrics article={item.article} />
-                      {item.article.source.kind === "arxiv" && (
-                        <p className="paper-authors">
-                          {item.article.author ||
-                            item.article.metrics.authors?.join(", ") ||
-                            "作者未提供"}
-                        </p>
-                      )}
-                      <details className="recommendation-reasons">
-                        <summary>
-                          推荐依据
-                          {item.related_count > 0
-                            ? ` · 关联 ${item.related_count} 条报道`
-                            : ""}
-                        </summary>
-                        <ul>
-                          {item.reasons.map((reason) => (
-                            <li key={reason}>{reason}</li>
-                          ))}
-                        </ul>
-                      </details>
-                      {item.article.original_url && (
-                        <a
-                          className="original-link"
-                          href={item.article.original_url}
-                          target="_blank"
-                          rel="noreferrer"
+                        <div className="recommend-meta">
+                          <SourceMark
+                            name={item.article.source.name}
+                            kind={item.article.source.kind}
+                          />
+                          <span>{sourceLabel(item.article.source.name)}</span>
+                          <time>{articleTime(item.article)}</time>
+                        </div>
+                        <button
+                          className="recommend-title"
+                          onClick={() => open(item.article.id)}
                         >
-                          原始来源 <ArrowUpRight size={12} />
-                        </a>
-                      )}
-                    </article>
-                  ))
-                ) : (
-                  <Empty title="当前主题暂无符合条件的内容" />
-                )}
-              </section>
-            ))}
+                          {item.article.title_zh ||
+                            item.article.title ||
+                            "无标题"}
+                        </button>
+                        <p className="recommend-summary">
+                          {item.article.summary_zh ||
+                            item.article.body.slice(0, 180) ||
+                            "原文未提供摘要"}
+                        </p>
+                        <Metrics article={item.article} />
+                        <ModelFacts article={item.article} />
+                        <ContentFacts article={item.article} />
+                        {item.exposure?.status === "updated" && (
+                          <span className="inline-notice">
+                            已推荐内容有实质更新
+                          </span>
+                        )}
+                        {item.exposure?.recent && (
+                          <span className="muted">近期已展示 · 内容未变</span>
+                        )}
+                        {item.article.source.kind === "arxiv" && (
+                          <p className="paper-authors">
+                            {item.article.author ||
+                              item.article.metrics.authors?.join(", ") ||
+                              "作者未提供"}
+                          </p>
+                        )}
+                        <details className="recommendation-reasons">
+                          <summary>
+                            推荐依据
+                            {item.related_count > 0
+                              ? ` · 关联 ${item.related_count} 条报道`
+                              : ""}
+                          </summary>
+                          <ul>
+                            {item.reasons.map((reason) => (
+                              <li key={reason}>{reason}</li>
+                            ))}
+                          </ul>
+                        </details>
+                        {item.article.original_url && (
+                          <a
+                            className="original-link"
+                            href={item.article.original_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            原始来源 <ArrowUpRight size={12} />
+                          </a>
+                        )}
+                      </article>
+                    ))
+                  ) : (
+                    <Empty title="当前主题暂无符合条件的内容" />
+                  )}
+                </section>
+              ))}
           </div>
           {(data.coverage.project_candidates_truncated ||
             data.coverage.article_candidates_truncated) && (

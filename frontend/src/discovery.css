@@ -94,6 +94,65 @@
   margin: 0;
   accent-color: var(--brand);
 }
+.interest-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin-bottom: 18px;
+}
+.interest-groups fieldset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.interest-groups legend {
+  color: var(--ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.interest-groups .interest-options {
+  gap: 10px 18px;
+  margin: 0;
+}
+.interest-options small {
+  font-size: var(--text-meta);
+  color: var(--muted);
+}
+.source-discovery {
+  margin-top: 10px;
+  max-width: 400px;
+}
+.source-discovery form {
+  padding-block: 14px;
+}
+.source-discovery .text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.source-discovery .inline-notice {
+  display: block;
+  margin-top: 8px;
+}
+.scan-list {
+  list-style: none;
+  padding: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+.scan-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  padding-block: 10px;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-meta);
+}
+.scan-list li > span:not(.state-badge) {
+  width: 100%;
+}
 .interest-panel .inline-notice {
   margin-left: 12px;
 }
@@ -474,7 +533,8 @@
   overflow-wrap: anywhere;
 }
 .recommend-section .empty-state {
-  min-height: 150px;
+  min-height: 96px;
+  flex-direction: row;
   border-block: 1px solid var(--border);
 }
 .history-dialog {
@@ -508,4 +568,134 @@
   margin-block: 8px;
   color: var(--brand);
   font-size: var(--text-label);
+}
+.model-filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+}
+.model-filter-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-label);
+  color: var(--text);
+}
+.model-filter-toolbar select {
+  max-width: 230px;
+}
+.model-facts {
+  overflow-wrap: anywhere;
+  margin-block: 12px;
+  font-size: var(--text-meta);
+}
+.model-tags,
+.model-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.model-tags strong {
+  color: var(--ink);
+}
+.model-tags > span {
+  background: var(--surface-soft);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+.model-links {
+  margin-top: 10px;
+}
+.model-links a {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--brand);
+}
+.model-links a:hover {
+  text-decoration: underline;
+}
+.model-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin-block: 18px;
+}
+.model-details div {
+  min-width: 0;
+}
+.model-details dt {
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+.model-details dd {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: var(--text-compact);
+  overflow-wrap: anywhere;
+}
+.model-caution {
+  font-size: var(--text-label);
+  color: var(--warning);
+  margin-block: 12px;
+}
+.model-specifications {
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  padding-top: 12px;
+}
+.model-specifications summary {
+  color: var(--ink);
+  font-size: var(--text-compact);
+  font-weight: 600;
+  cursor: pointer;
+}
+.model-specification {
+  padding-block: 12px;
+  border-top: 1px solid var(--border);
+}
+.model-specification strong {
+  color: var(--ink);
+  font-size: var(--text-label);
+}
+.model-specification blockquote {
+  margin: 6px 0;
+  color: var(--text);
+  font-size: var(--text-compact);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.policy-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px 24px;
+  margin: 16px 0;
+}
+.policy-fields label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.policy-fields input {
+  width: 76px;
+  min-height: 36px;
+}
+.policy-panel fieldset {
+  border: 0;
+  margin: 18px 0;
+  padding: 0;
+}
+.policy-panel legend {
+  font-weight: 600;
+}
+.coverage-runtime {
+  padding: 14px 0;
+}
+.coverage-panel .table-scroll {
+  max-height: 480px;
+  overflow: auto;
 }

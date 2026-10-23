@@ -1,3 +1,4 @@
+from .arxiv import ArxivCollector
 from .github import GitHubCollector
 from .github_discovery import GitHubDiscoveryCollector
 from .hackernews import HackerNewsCollector
@@ -6,7 +7,7 @@ from .rss import RSSCollector
 
 COLLECTORS = {
     "rss": RSSCollector,
-    "arxiv": RSSCollector,
+    "arxiv": ArxivCollector,
     "hackernews": HackerNewsCollector,
     "github": GitHubCollector,
     "github_discovery": GitHubDiscoveryCollector,

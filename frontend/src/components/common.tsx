@@ -125,6 +125,7 @@ export function SourceMark({ name, kind }: { name: string; kind: string }) {
     "OpenAI News": "openai",
     "Google DeepMind": "deepmind",
     "Hugging Face 热门模型": "huggingface",
+    "Hugging Face 模型发现": "huggingface",
     "Hugging Face 技术数据集": "huggingface",
   };
   if (images[name])

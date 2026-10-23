@@ -11,6 +11,8 @@ export type Source = {
   last_success_at: string | null;
   last_status: string;
   last_error: string | null;
+  discovery_topics?: string[];
+  discovery_scope_customized?: boolean;
 };
 export type Article = {
   id: string;
@@ -136,8 +138,101 @@ export type ArticleMetrics = {
   likes?: number | null;
   updated_at?: string | null;
   observed_at?: string;
+  feed_time_kind?: "published" | "updated" | "unknown";
+  model?: ModelInfo;
+  research?: { quotes: EvidenceQuote[]; independent_replication: string };
+  references?: { id: string; kind: string; url: string }[];
+  resource?: {
+    type: string;
+    label: string;
+    readme_status?: string;
+    vibe_status: string;
+    vibe_evidence?: { text: string; source_url: string } | null;
+    quotes: EvidenceQuote[];
+    execution_verified: boolean;
+  };
 };
-export type Topic = { id: string; label: string };
+export type EvidenceQuote = {
+  kind: string;
+  text: string;
+  source_url: string;
+  revision: string | null;
+};
+export type ModelInfo = {
+  id: string | null;
+  publisher_id: string | null;
+  publisher: string;
+  publisher_verified: boolean;
+  publisher_evidence: string | null;
+  task: string | null;
+  task_label?: string | null;
+  modalities?: { inputs: string[]; outputs: string[]; basis: string } | null;
+  specifications?: {
+    kind: string;
+    text: string;
+    source_url: string;
+    revision: string | null;
+  }[];
+  topics: string[];
+  version: string | null;
+  revision?: string | null;
+  license: string | null;
+  access: string;
+  weight_file_count?: number;
+  hub_created_at?: string | null;
+  hub_updated_at?: string | null;
+  release_at: string | null;
+  release_status: string;
+  release_evidence: string | null;
+  card_status: string;
+  card_revision?: string | null;
+  card_url: string | null;
+  weights_url: string | null;
+  code_url: string | null;
+  paper_url: string | null;
+};
+export type Publisher = {
+  id: string;
+  label: string;
+  author: string | null;
+  website: string;
+  verification: string;
+  evidence_url: string;
+  verified_at: string;
+};
+export type Topic = {
+  id: string;
+  label: string;
+  group?: string;
+  batch?: number;
+  discovery_ready?: boolean;
+  collectors?: string[];
+};
+export type DiscoveryCoverage = {
+  topics: Topic[];
+  sources: {
+    source_id: string;
+    name: string;
+    enabled: boolean;
+    automatic: boolean;
+    scan_cycle_hours: number;
+    request_budget: number;
+    groups: {
+      id: string;
+      label: string;
+      topics: string[];
+      status: string;
+      last_scan_at: string | null;
+      last_success_at: string | null;
+      candidates: number | null;
+      error: string | null;
+      added?: number;
+      updated?: number;
+      duplicates?: number;
+      failed?: number;
+    }[];
+  }[];
+};
 export type StarGrowth = {
   value: number | null;
   baseline_at: string | null;
@@ -202,8 +297,35 @@ export type Recommendation = {
   recommendation_score: number;
   reasons: string[];
   related_count: number;
+  exposure?: { revision_hash: string; status: string; recent: boolean };
+};
+export type RecommendationPolicy = {
+  section_limits: Record<string, number>;
+  topic_weights: Record<string, number>;
+  repeat_hours: number;
+};
+export type RuntimeReport = {
+  observation: {
+    started_at: string | null;
+    observed_hours: number;
+    samples: number;
+    window_hours: number;
+    max_gap_minutes: number | null;
+    status: string;
+    seven_day_status: string;
+  };
+  scheduler_enabled: boolean;
+  concurrency: number;
+  task_timeout_seconds: number;
+  runs_24h: { status: string; count: number; added: number; failed: number }[];
+  llm_24h: {
+    attempts: number;
+    input_tokens: number | null;
+    output_tokens: number | null;
+  };
 };
 export type Dashboard = {
+  policy?: RecommendationPolicy;
   generated_at: string;
   topics: Topic[];
   interests: string[];
@@ -261,3 +383,16 @@ export const dateTime = (value: string | null) =>
         minute: "2-digit",
       })
     : "时间未提供";
+
+export function articleTime(article: Article): string {
+  const model = article.metrics?.model;
+  if (article.source.kind === "hf_models") {
+    const updated = model?.hub_updated_at || article.metrics?.updated_at;
+    return updated
+      ? `Hub 更新 ${dateTime(updated)}`
+      : `首次发现 ${dateTime(article.collected_at)}`;
+  }
+  return article.published_at
+    ? `${article.metrics?.feed_time_kind === "updated" ? "来源更新 " : ""}${dateTime(article.published_at)}`
+    : `首次发现 ${dateTime(article.collected_at)}`;
+}

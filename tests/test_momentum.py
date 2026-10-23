@@ -130,7 +130,9 @@ def test_daily_history_normalization_keeps_utc_dates_and_does_not_fill_missing()
 
 
 def test_search_rotation_covers_age_lanes_and_pages_without_unbounded_star_leaderboard():
-    searches = [discovery_search(tick, AT, 10) for tick in range(64)]
+    from frontiersignal.collectors.github_discovery import QUERIES
+
+    searches = [discovery_search(tick, AT, 10) for tick in range(len(QUERIES) * 8)]
     assert len({lane for _, lane in searches}) == 4
     assert {query["page"] for query, _ in searches} == {1, 2}
     for query, lane in searches:
