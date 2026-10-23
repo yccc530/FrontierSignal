@@ -63,6 +63,22 @@ npm --prefix frontend run build
 
 可以按受影响文件缩小 pytest 范围。测试覆盖标准化、URL、精确去重、数据库交互、模型失败重试、任务状态、推荐窗口与核心前端交互。
 
+## GitHub Actions
+
+配置文件为 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)，工作流名称为 `CI`。
+
+- 推送到 `main`、向 `main` 创建或更新 PR 时自动运行，也支持手动运行。
+- `Backend checks`：Python 3.11、uv 0.12.5，按 `uv.lock` 安装依赖，执行 Ruff 和 pytest。
+- `Frontend tests and build`：Node.js 22，执行 `npm ci`、Vitest 和 TypeScript / Vite 生产构建。
+- 两个任务并行运行，单个任务最长 15 分钟；同一分支的新运行会取消尚未结束的旧运行。
+- 第三方 Actions 固定到完整提交 SHA；仓库权限仅为读取，checkout 不保留认证凭据。
+
+在 GitHub 仓库点击 **Actions → CI**，选择一次运行，再点击对应任务和步骤查看日志。绿色表示通过，红色表示失败。手动运行时，在 CI 页面选择 **Run workflow → 分支 → Run workflow**。
+
+不需要添加 API Key、GitHub Token 或其他 Secrets。运行环境不创建私有 `.env`，后端关闭自动调度，现有单元测试使用临时 SQLite 和 HTTP 夹具；安装依赖和缓存仍需要网络。
+
+这个工作流不启动日常采集服务，不执行付费 LLM、真实外网采集、PostgreSQL 集成或依赖真实资讯的 Playwright 测试，也不自动部署。CI 通过表示上述代码检查通过，不等于来源始终可用或 Windows 原生环境已验收。
+
 ## PostgreSQL 集成
 
 ```text

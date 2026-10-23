@@ -1,5 +1,7 @@
 # FrontierSignal
 
+[![CI](https://github.com/yccc530/FrontierSignal/actions/workflows/ci.yml/badge.svg)](https://github.com/yccc530/FrontierSignal/actions/workflows/ci.yml)
+
 **面向个人技术研究者的 AI 技术情报工作台。**
 
 持续发现短期 Stars 增长显著的开源项目，跟踪模型发布、前沿论文与开发工具，在本地工作台中完成中文阅读、检索、收藏和来源追踪。
@@ -149,6 +151,8 @@ FS_LLM_MODEL=your-model-id
 应用按个人本地使用设计，默认监听 `127.0.0.1`，没有远程账户认证。数据保存在本机 PostgreSQL；启用云端 LLM 时，待分析的标题和正文片段会发送给你配置的服务商。电脑休眠、关闭 WSL 或停止后端期间不会采集，不承诺补齐停机期间的全部资讯。
 
 ## 开发与项目文档
+
+仓库已配置 [GitHub Actions 自动检查](https://github.com/yccc530/FrontierSignal/actions/workflows/ci.yml)：推送到 `main`、向 `main` 提交 PR 或手动运行时，自动执行 Ruff、后端单元测试、前端单元测试和生产构建。无需配置 Secrets，不调用付费模型或实时采集接口；使用方法见 [开发与测试](docs/testing.md#github-actions)。
 
 后端采用 Python 3.11、FastAPI、SQLAlchemy、Alembic、APScheduler；数据库使用 PostgreSQL 和 pgvector。前端采用 React、TypeScript、Vite、Tailwind CSS、shadcn/ui 和 TanStack Query。应用使用模块化单体结构，采集任务在后台运行，默认单进程服务。
 
