@@ -1,21 +1,46 @@
-# 信息源
+# 信息来源与采集范围
+
+[返回项目首页](../README.md) · [管理来源](usage.md#管理来源) · [配置预算与代理](configuration.md)
 
 优先公开 HTTPS RSS/Atom 和官方 API，不执行登录、验证码处理、浏览器指纹模拟。
 
-| 来源 | 接口 | 当前情况 |
-| --- | --- | --- |
-| Hugging Face Blog / OpenAI / DeepMind | 官方 RSS | 已真实采集；HF feed 部分条目只有标题 |
-| Google AI / NVIDIA 技术博客 | 官方 RSS | B2 新增；已真实采集，技术筛选后推荐 |
-| HN | Firebase 官方 API | top / best / new 及有限公开评论采样；真实 points / 评论总数 |
-| GitHub 固定仓库 | 官方 Releases API | 保留 vLLM / LangChain；ETag |
-| GitHub AI 项目发现 | 官方 Search / Repositories / Releases / Contents / README / Star History API | 30 组主题及补充关键词，年龄/规模、短期增长与版本跟踪 |
-| Hugging Face 模型 | 官方 Hub API / README | 全站补充、任务和组织轮换，模型卡按提交缓存，指标独立记录 |
-| Hugging Face 数据集 | 官方 Hub API | 热门补充与八组技术关键词，实际下载数/喜欢数、创建和更新时间 |
-| arXiv | 官方分类 RSS | cs.AI / cs.LG / cs.CL / cs.CV；360 分钟默认频率 |
-| arXiv 专项工程与科学 | 官方 Atom 查询 API | 12 个方向，默认 120 分钟；查询间至少三秒，独立任务不影响原 RSS |
-| RSSHub | 用户选择的公开 feed | 可选外部适配，不内嵌服务 |
+## 默认来源
 
-新增采集器：实现 `collectors/base.py` 的 Collector 协议，返回 RawItem 与 Collection。
+新数据库首次启动时初始化下列 16 个来源配置。它们是可编辑的采集配置，不是预置资讯数据。
+同一个模型来源会轮换多个任务与组织，不需要为每个主题再添加一个来源。
+
+| 默认来源                                          | 配置数 | 默认间隔 | 主要内容                       |
+| ------------------------------------------------- | ------ | -------- | ------------------------------ |
+| GitHub AI 项目发现                                | 1      | 60 分钟  | 新项目、持续跟踪、Stars 与版本 |
+| vLLM / LangChain Releases                         | 2      | 120 分钟 | 固定仓库发布说明               |
+| Hugging Face 模型发现                             | 1      | 60 分钟  | 模型元数据与有界模型卡         |
+| Hugging Face 技术数据集                           | 1      | 360 分钟 | 热门及主题数据集               |
+| Hugging Face Blog / OpenAI News / Google DeepMind | 3      | 120 分钟 | 官方发布、研究与工程文章       |
+| Google AI / NVIDIA 技术博客                       | 2      | 120 分钟 | 官方技术动态                   |
+| Hacker News                                       | 1      | 120 分钟 | 技术讨论及有限评论采样         |
+| arXiv cs.AI / cs.LG / cs.CL / cs.CV               | 4      | 360 分钟 | 分类订阅中的近期论文           |
+| arXiv 专项工程与科学研究                          | 1      | 120 分钟 | 12 个工程、空间与科学研究方向  |
+
+可在「信息来源」修改频率、启停和自动状态。GitHub 发现、HF 模型、HF 数据集和 arXiv 专项支持独立主题范围；普通分类 RSS 使用订阅本身的范围。关闭来源不删除历史数据。
+
+默认未配置 Anthropic 的自动来源；X、Reddit 当前不接入。RSSHub 仅作为可选外部公开订阅消费方式，不包含在上述 16 个来源中，也不内嵌运行 RSSHub 服务。
+
+## 接口与采集器
+
+| 来源                                  | 接口                                                                         | 当前情况                                                       |
+| ------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Hugging Face Blog / OpenAI / DeepMind | 官方 RSS                                                                     | 已真实采集；HF feed 部分条目只有标题                           |
+| Google AI / NVIDIA 技术博客           | 官方 RSS                                                                     | B2 新增；已真实采集，技术筛选后推荐                            |
+| HN                                    | Firebase 官方 API                                                            | top / best / new 及有限公开评论采样；真实 points / 评论总数    |
+| GitHub 固定仓库                       | 官方 Releases API                                                            | 保留 vLLM / LangChain；ETag                                    |
+| GitHub AI 项目发现                    | 官方 Search / Repositories / Releases / Contents / README / Star History API | 30 组主题及补充关键词，年龄/规模、短期增长与版本跟踪           |
+| Hugging Face 模型                     | 官方 Hub API / README                                                        | 全站补充、任务和组织轮换，模型卡按提交缓存，指标独立记录       |
+| Hugging Face 数据集                   | 官方 Hub API                                                                 | 热门补充与八组技术关键词，实际下载数/喜欢数、创建和更新时间    |
+| arXiv                                 | 官方分类 RSS                                                                 | cs.AI / cs.LG / cs.CL / cs.CV；360 分钟默认频率                |
+| arXiv 专项工程与科学                  | 官方 Atom 查询 API                                                           | 12 个方向，默认 120 分钟；查询间至少三秒，独立任务不影响原 RSS |
+| RSSHub                                | 用户选择的公开 feed                                                          | 可选外部适配，不内嵌服务                                       |
+
+新增来源的操作见 [使用指南](usage.md#管理来源)。新增代码级采集器：实现 `collectors/base.py` 的 Collector 协议，返回 RawItem 与 Collection。
 注册 `COLLECTORS` 后添加来源配置，业务存储/任务/API 不应再针对来源分支。
 需要仓库持续跟踪的采集器由任务层注入数据库中待跟踪目标；其余采集器仍不依赖数据库。
 
@@ -25,21 +50,21 @@ RSS content 优先于 summary；日期缺失为 null；有 ETag/Last-Modified �
 
 ## 能力与限制
 
-| 采集器 | 最新窗口 | 增量/游标 | 正文范围 |
-| --- | --- | --- | --- |
-| RSS / arXiv | 默认前 30 条 | ETag / Last-Modified，304 无变化 | feed 的 content / summary |
-| HN | 三种榜单各最多 20 条，详情并发 4 | 榜单候选去重；平台 ID 和讨论链接保留不同讨论 | 原帖 text；最多 5 个优先技术帖各采样 3 条顶层评论，不抓站外正文 |
-| GitHub Releases | 指定仓库最近 30 个发布 | ETag；不回溯全量分页历史 | release.body |
-| GitHub 发现 | 默认每小时 2 组查询，每组 10 个候选 | 30 组主题与 4 种候选范围、关键词变体轮换；10 个跟踪名额 | 官方简介、目录、最近 3 个版本；每轮最多 8 个获星历史、2 份 24,000 字符 README |
-| HF 模型 | 默认每小时 6 个查询名额，每次 5 个候选；合并同轮重复全站请求 | 全站/主题/组织轮换；来源范围独立保存；资源 ID 去重 | full/cardData 元数据；每轮最多 6 份模型卡，每份保存前 30,000 字符并记录截断 |
-| HF 数据集 | 每轮最多三组、每组十个候选 | 热门与主题轮换；资源 ID 去重、指标更新 | API description / pipeline / tags，不冒充完整数据集卡 |
+| 采集器          | 最新窗口                                                     | 增量/游标                                               | 正文范围                                                                      |
+| --------------- | ------------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| RSS / arXiv     | 默认前 30 条                                                 | ETag / Last-Modified，304 无变化                        | feed 的 content / summary                                                     |
+| HN              | 三种榜单各最多 20 条，详情并发 4                             | 榜单候选去重；平台 ID 和讨论链接保留不同讨论            | 原帖 text；最多 5 个优先技术帖各采样 3 条顶层评论，不抓站外正文               |
+| GitHub Releases | 指定仓库最近 30 个发布                                       | ETag；不回溯全量分页历史                                | release.body                                                                  |
+| GitHub 发现     | 默认每小时 2 组查询，每组 10 个候选                          | 30 组主题与 4 种候选范围、关键词变体轮换；10 个跟踪名额 | 官方简介、目录、最近 3 个版本；每轮最多 8 个获星历史、2 份 24,000 字符 README |
+| HF 模型         | 默认每小时 6 个查询名额，每次 5 个候选；合并同轮重复全站请求 | 全站/主题/组织轮换；来源范围独立保存；资源 ID 去重      | full/cardData 元数据；每轮最多 6 份模型卡，每份保存前 30,000 字符并记录截断   |
+| HF 数据集       | 每轮最多三组、每组十个候选                                   | 热门与主题轮换；资源 ID 去重、指标更新                  | API description / pipeline / tags，不冒充完整数据集卡                         |
 
 来源频率最小 15 分钟；arXiv 默认 360 分钟。单来源任务默认最多 180 秒，3 个来源任务并行。
 GitHub token 可选，仅发往官方 API；无 token 会受公共访问限额影响。
 新来源的主机需要在公开域名白名单中，额外域名由本地 FS_EXTRA_FEED_HOSTS 配置。
 RSSHub 只消费用户有权使用的公开 HTTPS 订阅，本版不开放内网地址例外。
 
-## 主题与轮换（B1–B8）
+## 主题与轮换
 
 `topics.py` 注册 30 个分组主题，全部具备 GitHub 查询。HF 专项 15 个方向，包含基础与创作模型、
 3D/CAD、世界模型、机器人、科学计算、数学、材料和生物。注册/启用查询不等于获得该方向全部样本。
@@ -55,7 +80,7 @@ HF 默认共 61 个扫描组：全站 1 组、任务/关键词 46 组、组织 1
 主题/组织排序在创建时间、更新时间和趋势间轮换；组织查询只指定 author，在本地按组织方向和用户范围
 筛选实际返回模型，不给所有组织强加 text-generation。扫描组完成不代表每个排序或全部分页都已扫完。
 当前每组只取有界首页，不承诺穷尽所有模型；用户保存的自定义范围不会被升级覆盖。
-原 360 分钟 HF 模型默认在本机调整为 60 分钟；启动种子不会覆盖用户另行设置的频率或范围。
+新建 HF 模型来源默认 60 分钟；旧数据库可能仍保留早期的 360 分钟设置，可在页面调整。启动种子不会覆盖已有频率或范围。
 
 ## B4–B7 新增入口与限制
 
@@ -75,20 +100,20 @@ HF 默认共 61 个扫描组：全站 1 组、任务/关键词 46 组、组织 1
 
 默认 GitHub 主题轮换约 15 小时（关键词、年龄、页码组合需更多轮），专项论文约 12 小时，数据集约 18 小时。
 来源页显示当前预算/估计及真实扫描结果；关闭自动采集、停机或限额时不会补写成功状态。
-完整请求、首轮计数与缺口见 `docs/testing.md` 和本地 `.runtime/b4-b8-live.json`。
+完整请求、首轮计数与缺口见 [历史验收记录](validation-history.md)；开发环境原始报告位于未提交的 `.runtime/b4-b8-live.json`。
 
 下表身份依据于 2026-10-22 实际核对；B2 查询与持久化在 10 月 22–23 日验证。
 统一台账为 `publishers.py`，`/api/publishers` 返回公开依据，不包含任何凭据。
 
-| 发布者 | 已接入入口 | 身份核验与范围 |
-| --- | --- | --- |
-| OpenAI | HF `openai`；原 OpenAI RSS | Hub 组织 overview 返回已认证；模型名称含 GPT 不自动判为官方 |
-| Google | HF `google`；DeepMind RSS；`https://blog.google/technology/ai/rss/` | Hub 已认证组织；Google AI RSS HTTP 200，20 条真实入库 |
-| 阿里 Qwen | HF `Qwen` | `https://qwen.readthedocs.io/en/latest/` 链接至该 Hub 组织；不宣称其 Hub 认证字段为 true |
-| DeepSeek | HF `deepseek-ai` | Hub 已认证组织；其他用户名下同名/衍生模型保持社区来源 |
-| Mistral AI | HF `mistralai` | Hub 已认证组织 |
-| Microsoft | HF `microsoft` | Hub 已认证组织；`https://blogs.microsoft.com/ai/feed/` 返回 410，未启用该 RSS |
-| NVIDIA | `https://developer.nvidia.com/blog/feed/` | 官方技术 RSS HTTP 200；限窗口前 30 条，本轮全部入库；未增加 NVIDIA Hub 专项 |
+| 发布者     | 已接入入口                                                          | 身份核验与范围                                                                           |
+| ---------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| OpenAI     | HF `openai`；原 OpenAI RSS                                          | Hub 组织 overview 返回已认证；模型名称含 GPT 不自动判为官方                              |
+| Google     | HF `google`；DeepMind RSS；`https://blog.google/technology/ai/rss/` | Hub 已认证组织；Google AI RSS HTTP 200，20 条真实入库                                    |
+| 阿里 Qwen  | HF `Qwen`                                                           | `https://qwen.readthedocs.io/en/latest/` 链接至该 Hub 组织；不宣称其 Hub 认证字段为 true |
+| DeepSeek   | HF `deepseek-ai`                                                    | Hub 已认证组织；其他用户名下同名/衍生模型保持社区来源                                    |
+| Mistral AI | HF `mistralai`                                                      | Hub 已认证组织                                                                           |
+| Microsoft  | HF `microsoft`                                                      | Hub 已认证组织；`https://blogs.microsoft.com/ai/feed/` 返回 410，未启用该 RSS            |
+| NVIDIA     | `https://developer.nvidia.com/blog/feed/`                           | 官方技术 RSS HTTP 200；限窗口前 30 条，本轮全部入库；未增加 NVIDIA Hub 专项              |
 
 Hub 认证依据来自 `https://huggingface.co/api/organizations/{author}/overview`。
 六个 Hub 组织查询均真实成功且已存模型记录；这些组织仍可发布无关任务，入库按实际主题筛选。
@@ -100,11 +125,11 @@ Hub 认证依据来自 `https://huggingface.co/api/organizations/{author}/overvi
 复用同一 `hf-models` 来源，不为三个方向重复建库或重复创建源；全站、任务与组织候选按模型 ID 合并。
 以下 11 种任务参数都实际返回了与任务匹配的 Hub 记录：
 
-| 方向 | Hub pipeline_tag | 补充名称检索 |
-| --- | --- | --- |
-| 图像 | text-to-image、image-to-image、image-text-to-image | inpainting、super-resolution、subject-consistency |
-| 视频 | text-to-video、image-to-video、image-text-to-video、video-to-video | video-editing、camera-control |
-| 语音与音频 | automatic-speech-recognition、text-to-speech、text-to-audio、audio-to-audio | musicgen、realtime-speech、sound-effects |
+| 方向       | Hub pipeline_tag                                                            | 补充名称检索                                      |
+| ---------- | --------------------------------------------------------------------------- | ------------------------------------------------- |
+| 图像       | text-to-image、image-to-image、image-text-to-image                          | inpainting、super-resolution、subject-consistency |
+| 视频       | text-to-video、image-to-video、image-text-to-video、video-to-video          | video-editing、camera-control                     |
+| 语音与音频 | automatic-speech-recognition、text-to-speech、text-to-audio、audio-to-audio | musicgen、realtime-speech、sound-effects          |
 
 共 19 个新增任务/关键词组，连续 25 轮真实采集均成功。`subject-consistency` 的本轮候选为 0，
 不宣称这一关键词已得到真实样本；其余 18 组有返回。名称检索只覆盖名称匹配范围，不等于搜索完整 README。
@@ -113,14 +138,14 @@ GitHub 增加 text-to-image、video-generation、text-to-speech 主题发现，�
 
 新增六个组织的身份依据如下；代码仓库交叉链接与 Hub 认证分开记录，不混淆为同一种验证。
 
-| 发布者 / Hub author | 方向 | 本轮身份依据 |
-| --- | --- | --- |
-| Black Forest Labs / black-forest-labs | 图像 | Hub organization overview 的 isVerified=true |
-| Stability AI / stabilityai | 图像、音频 | `https://github.com/Stability-AI/stable-audio-tools` README 链接至 stabilityai；generative-models 仓库亦提供同组织模型链接 |
-| 阿里 Wan / Wan-AI | 视频 | `https://github.com/Wan-Video/Wan2.2` README 链接至 Wan-AI |
-| Lightricks / Lightricks | 视频 | `https://github.com/Lightricks/LTX-Video` README 链接至同名 Hub 模型 |
-| FunAudioLLM / FunAudioLLM | 音频 | `https://github.com/FunAudioLLM/CosyVoice` README 链接至同名 Hub 模型；不宣称拥有 Hub 认证徽标 |
-| ACE-Step / ACE-Step | 音频、音乐 | `https://github.com/ACE-Step/ACE-Step` README 链接至同名 Hub 模型；不宣称拥有 Hub 认证徽标 |
+| 发布者 / Hub author                   | 方向       | 本轮身份依据                                                                                                               |
+| ------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Black Forest Labs / black-forest-labs | 图像       | Hub organization overview 的 isVerified=true                                                                               |
+| Stability AI / stabilityai            | 图像、音频 | `https://github.com/Stability-AI/stable-audio-tools` README 链接至 stabilityai；generative-models 仓库亦提供同组织模型链接 |
+| 阿里 Wan / Wan-AI                     | 视频       | `https://github.com/Wan-Video/Wan2.2` README 链接至 Wan-AI                                                                 |
+| Lightricks / Lightricks               | 视频       | `https://github.com/Lightricks/LTX-Video` README 链接至同名 Hub 模型                                                       |
+| FunAudioLLM / FunAudioLLM             | 音频       | `https://github.com/FunAudioLLM/CosyVoice` README 链接至同名 Hub 模型；不宣称拥有 Hub 认证徽标                             |
+| ACE-Step / ACE-Step                   | 音频、音乐 | `https://github.com/ACE-Step/ACE-Step` README 链接至同名 Hub 模型；不宣称拥有 Hub 认证徽标                                 |
 
 部分 Wan 最新模型没有 pipeline_tag；仅对已核验组织的明确模型系列补充主题归类，
 任务与输入输出模态仍保持未知。社区使用相同名字不会因此获得官方身份。
@@ -137,7 +162,9 @@ GitHub 增加 text-to-image、video-generation、text-to-speech 主题发现，�
 规格摘录最多六类，每类保留一段原文并绑定源 URL/模型卡提交；跳过 YAML、代码块及媒体标签，
 相同原文在界面合并。它们是来源线索，可能是训练设置、示例或带否定的说明，不转换为最大能力。
 
-## 公开接口与限制
+## 已验证接口与限制
+
+以下为带日期的历史接口验证，不能保证第三方服务始终可用；你本机的最新结果以运行任务和扫描覆盖为准。
 
 2026-10-22 至 2026-10-23 实际调用并获得有效 JSON / feed：
 
@@ -164,4 +191,4 @@ Anthropic 本次试探的官方 `https://www.anthropic.com/rss.xml` 返回 404�
 未创建该来源，不使用未验证的第三方 feed 或登录抓取替代。后续有明确公开接口时通过 Collector 扩展。
 
 X / Reddit 当前均不接入：没有采集器、凭据设置或自动任务，旧库遗留来源在启动时禁用。
-本机 X 来源、失败任务和私有凭据已经清理。统一采集协议保留，不影响未来明确授权的扩展。
+统一采集协议保留，不影响未来明确授权的扩展。

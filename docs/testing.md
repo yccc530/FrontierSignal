@@ -1,483 +1,118 @@
-# 测试与验收
+# 开发与测试
 
-测试分两类：离线夹具测试验证可重复逻辑；真实服务测试证明当时环境的连通性。
-两者不能相互替代。已按用户授权配置火山网关并完成真实模型调用；X / Reddit 已从
-当前产品和本机数据库删除，不再需要相关凭据。向量服务仍未配置。
+[返回项目首页](../README.md) · [架构说明](architecture.md) · [历史验收记录](validation-history.md)
 
-当前只保留桌面代码和浏览器测试，10 张历史手机截图已删除。下文手机测试结果仅是历史记录，
-不代表仍保留手机界面、测试配置或截图文件。
+普通用户只需按 [安装指南](installation.md) 启动应用，不需要执行这里的验证脚本。本文面向修改代码、排查问题或验证新来源的开发者。
 
-## B4–B8 集中验收（2026-10-23，当前版本）
+## 开发环境
 
-按用户要求顺序开发，阶段内仅定向检查，最后集中验证。开发完成不等于长期验收完成。
-
-| 检查 | 实际结果 |
-| --- | --- |
-| pytest | 最终 138 项通过，5.63 秒；新增方向、误筛、范围历史、份额、指纹、引用、时间窗口 |
-| Ruff | `uv run ruff check backend tests scripts` 通过，74 个 Python 文件格式检查 |
-| Vitest | 10 项通过，1.71 秒 |
-| TypeScript / Vite | 2132 个模块构建通过，2.43 秒 |
-| Playwright | `models.spec.ts` + `discovery.spec.ts` 共 7 项通过，18.1 秒 |
-| 桌面补查 | 1440px 工具/工作流/论文筛选与详情；1024px 推荐设置无横向溢出，无页面 JS 错误 |
-| PostgreSQL | 增量迁移 `7bd38f1a90c2` 已应用；13 张业务表独立备份恢复成功 |
-| 真实中文分析 | MatterGen 成功，原文保持，再次请求 409；只验证一条，沿用原火山模型 |
-
-真实报告 `.runtime/b4-b8-live.json` 的前 10 轮全部 success：B4 模型新增 16；B5 GitHub
-两轮新增 8/重复 3；B6 三轮新增 17/重复 3；B7 模型新增 14，论文两轮新增 23，数据集新增 20/重复 10。
-共新增 98；1196 条旧资讯 ID、收藏/已读状态保持，临时采集范围全部恢复。
-发现缩小 HF 范围会裁掉旧扫描历史，已修复。从迁移前备份的独立恢复库补回 40 组旧证据，
-与当前结果合成 44 组，没有覆盖主库。补跑 B4 成功，新增 9/重复 6、扫描成功组增加到 48，旧组全部保留。
-补查报告 `.runtime/b4-retention-check.json`。11 轮合计新增 107、重复 22、失败 0，库中 1303 条。
-
-无 GitHub Token，验证只通过启动环境临时降低请求预算，未改写私有 `.env`，最终恢复正常预算。
-Vibe 成品尚无已读取 README 的作者声明；AI 设计主查询零候选。补充关键词进入后续轮换，
-不将零样本或尚未扫描子查询宣称为已覆盖。四类科学论文/模型都有真实样本，不承诺穷尽全部内容。
-
-历史重算预览后写入 1206 条规则/元数据变更，无 LLM 请求。随后运行
-`uv run python scripts/backfill_technical.py --limit 5000 --link-references --apply`，
-新增或提升 114 对直接引用；再次预览元数据变更 0、引用变更 0，原始记录未删除。
-不同模型 ID 可有明确依赖引用，首页仍不合并为同一模型；两个作品共同依赖一个库不因此关联。
-修复了多标签抢占份额、扫描历史清理及 PostgreSQL 驱动 rowcount 未知的计数问题，最终用 RETURNING
-的实际结果计数；未将初次失败检查描述为通过。
-
-额外浏览器实测：卡片至少一半进入视口后 API 返回 `recorded=4`，该未变化样本随后让位给未展示候选。
-报告 `.runtime/exposure-verification.json`；查询 API 或页面外卡片不记展示。
-截图为 `.runtime/desktop-expansion-coverage.png`、`desktop-expansion-tool-detail.png`、
-`desktop-expansion-recommendations.png`；工具/工作流/论文分别有 65/4/157 条通过技术筛选的记录。
-额外阅读交互恢复原已读状态；没有手机实现或手机验证。备份详情见 `docs/backup-recovery.md`。
-
-24 小时观察从恢复正常调度开始记录，开发期间关闭调度和夹具时间不算实测；真实 7 天增长另行验收。
-Windows 原生安装、较大历史库压力、零样本与未扫描查询仍是明确边界。
-最终重启已恢复正常预算与自动调度，健康接口为 ok，4 条展示记录跨重启保持；
-观察开始时间为 2026-10-23 05:18:26（Asia/Shanghai），当前状态 pending。
-火山模型与 16 个来源保留，四个专项来源均恢复原默认范围；最终状态记录在 `.runtime/b4-b8-final-state.json`。
-
-## B3 创作模型验收（2026-10-23，B4–B8 之前）
-
-本轮复用现有采集器、JSON 元数据和桌面页面，增加图像、视频、语音/音频/音乐主题。
-没有新增数据库迁移或依赖，没有下载/运行模型权重；火山网关地址、密钥和模型配置保持不变。
-
-| 检查 | 实际结果 |
-| --- | --- |
-| 后端 | `uv run pytest -q`：110 passed，5.68 秒 |
-| Python 静态与格式 | Ruff check 通过，67 个 Python 文件格式检查通过 |
-| 前端单元 | Vitest：10 passed，1.36 秒 |
-| 生产构建 | TypeScript / Vite 成功；2129 个模块，2.44 秒 |
-| 桌面联调 | Playwright：14 passed，25.5 秒；1024/1440/1920px，无手机配置 |
-| 类型与格式 | 新模型/视觉 E2E strict TypeScript 通过；修改文件 Prettier、git diff --check 通过 |
-| 真实模型发现 | HF 连续 25 轮全部 success；新增 200、更新 37、重复 286、过滤计数 74、失败 0 |
-| 真实中文处理 | 图像、视频、音频各一条真实分析成功；原文保持，重复请求均返回 409 |
-| 备份恢复 | 1149 条资讯、1809 个原始版本、15 个来源；独立恢复库全部 10 张业务表计数一致 |
-
-新增后端用例覆盖全部 11 种任务、无 LLM 关键词的创作模型、七个主题公平轮换、每组排序轮换、
-组织范围、错误主题返回过滤、未知任务/模态、带否定与示例限定的规格原文、提交链接、
-YAML/代码块排除、缓存保留、普通编辑教程/娱乐噪声、官方 Sora/Veo/Imagen 等标题归类、
-模型筛选和已有用户状态。未认证社区使用 Wan 同名不会获得官方身份或无依据的模态信息。
-
-真实来源验证采用运行中的 API：
-
-```powershell
-uv run python scripts/verify_model_sources.py --batch 3 --rounds 25 --analyze-each
-```
-
-- 2026-10-23 01:07–01:13（Asia/Shanghai），脚本退出 0；前后记录 885 → 1085，
-  旧 885 个 ID、收藏和已读逐条保持。轮换保留既有基础模型，因此 200 是本轮 HF 总新增，
-  不把它表述成 200 个全新创作基础模型。重复和更新不会创建额外资讯行。
-- 报告为 `.runtime/batch-3-verification.json`。全部 40 个 HF 扫描组有成功记录，
-  其中 19 个 B3 查询组全部完成，18 个有返回，`subject-consistency` 返回 0。
-  零候选是实际结果，不伪造该关键词样本；有返回也不代表穷尽全部候选或已经运行验证模型。
-- 六个新组织均有实际入库记录：Black Forest Labs 6、Stability AI 10、Wan 9、Lightricks 13、
-  FunAudioLLM 10、ACE-Step 8（验收时全库计数，非固定预期或单轮新增）。
-- 11 种 pipeline_tag 逐项探测得到匹配记录；部分 Wan 新记录没有标签，依已核验组织的
-  明确系列名归入视频，task/modalities 仍为空。公开权重、gated 限制和模型身份分别保存。
-- 初次部分组织探测被 DNS 公网校验拒绝，错误为 `Feed DNS resolved to a non-public address`；
-  后续真实请求恢复。未关闭 DNS/TLS 校验，没有通过代理设置变更绕过访问保护。
-- 六个发布者身份依据保存于 `publishers.py` 与 `data-sources.md`；BFL 使用实际 Hub 认证字段，
-  其余使用官方仓库 README 到 Hub 的交叉链接，不把未认证徽标写成 true。
-
-三次真实中文模型任务分别为：
-
-| 方向 | 实际内容 | 任务 ID |
-| --- | --- | --- |
-| 图像 | Qwen-Image-2.1-PE-T2I 图像提示词组件 | 480ca4bd-10a4-447f-9806-d6aac2b3671c |
-| 视频 | LTX-2.5 Clean Plate 视频编辑 LoRA | 3c0d4952-230d-4772-91c5-829384258c45 |
-| 音频 | Stable Audio 3 Small Music | 077419c6-531e-414d-af6c-f7c24651635e |
-
-三条原文与调用前一致，中文证据说明区分模型卡宣称、示例和独立实测；不将 gated 权重或许可证声明
-推导为自由商用。上述仅证明本次文字分析链路，不证明这些生成模型的性能、实时性或许可证法律含义。
-
-GitHub 单独临时选择 image/video/audio 后连续两轮采集，并在 finally 恢复原范围：
-
-- `684524b4-8da9-45e9-940f-162ca62183a2`：success，新增 39、重复 10、过滤 4、失败 0。
-- `99f9f740-32a9-4a81-813e-ab3bb15a6383`：partial，新增 25、重复 20、过滤 1、失败 4。
-  一次获星历史和三次代码核验受访问限制/权限不足阻止，脚本退出 1，未跳过错误或冒充完整成功。
-  已采集的项目、发布和快照保留，累计新增 64 条项目/版本记录；验证后全库共 1149 条资讯。
-
-历史重算先预览，再应用于 885 条记录（163 条规则/元数据变化）；重复预览 0 变化，0 次 LLM。
-截图复查发现 YAML 基座模型名称被误提取为流式线索，以及同一原文按多个指标重复显示。
-已增加回归，排除 YAML 和代码块，并按原文/链接/提交合并显示。随后对 1149 条记录重算，
-6 条规格线索修正，再次预览 0 变化；原文、已存解读和用户状态不被这次重算覆盖。
-
-最终浏览器复测连接实际数据库：三类模型筛选、中文任务、模态、规格原文/提交链接、
-不同桌面窗口的详情无横向溢出，原收藏/已读/偏好/采集范围继续持久化，修改后均恢复。
-已查看 `.runtime/desktop-creative-image.png`、`desktop-creative-video.png`、`desktop-creative-audio.png`；
-规格摘录为来源文字，未完成分析的记录继续显示待中文解读，没有伪造翻译。
-
-验证期间通过进程环境临时关闭调度，避免后台写入干扰前后比较；没有将暂停写入 `.env`。
-最终重启后主页 HTTP 200，健康检查为 ok / postgresql / scheduler=true；GitHub/HF 自动开启、
-间隔 60 分钟，临时范围均已恢复默认。重启后的 HF 技术模型筛选分别返回图像 54、视频 50、
-音频 79 条（主题可重叠，验收时计数）；B4 的 3D 专项仍未启用，模型标识仍为 `volcengine/deepseek-v4.1-flash`。
-该批没有新增 schema，因此未重复运行全量迁移演练；真实 PostgreSQL 写入/读取和独立备份恢复已执行。
-当时 B4–B8 尚未实施；后续结果见本文开头。零样本、配额、长期运行和 Windows 原生限制仍独立记录。
-
-## B1/B2 验收（2026-10-23，B3 之前）
-
-基于既有模块扩展主题、采集和模型资讯；无数据库结构迁移、无手机实现、无 LLM 网关或密钥变更。
-以下数字为验收时快照；正常后台运行后记录数会继续改变。
-
-| 检查 | 实际结果 |
-| --- | --- |
-| 后端 | `uv run pytest -q`：88 passed，4.84 秒 |
-| Python 静态与格式 | Ruff check 通过，66 个 Python 文件 format 检查通过 |
-| 前端单元 | Vitest 9 passed，1.54 秒 |
-| 生产构建 | TypeScript / Vite 通过，2129 个模块，2.28 秒 |
-| 桌面联调 | Playwright 13 passed，19.8 秒；1024/1440/1920px，无手机配置 |
-| 额外类型与格式 | 新模型、视觉及工作台 E2E strict TypeScript 通过；修改前端文件 Prettier 通过；git diff --check 通过 |
-| PostgreSQL 集成 | 隔离新库完整迁移、pgvector 0.8.1、调度互斥与锁丢失验证通过；业务库 schema 仍为 8ac491d20e63 |
-| 备份恢复 | 849 条资讯、1271 个原始版本、15 个来源、109 个仓库、172 条 Stars 快照；10 张业务表恢复计数一致 |
-
-新增离线用例覆盖：旧主题兼容、30 项偏好与非法/重复值、独立来源范围与恢复默认、
-未接入主题不伪造扫描、HF 三路轮换及配额、单组失败继续推进、模型卡缓存及读取失败、
-未知版本/许可/发布日期、伪造 author 不改变发布者身份、两个模型同简介不合并、明确链接关联、
-模型无需 Stars 可被推荐、指标观测不冒充更新、模型/主题/团队过滤以及历史重算预览与幂等提交。
-模型卡失败与重试由 HTTP 夹具覆盖；真实分析验证与之分开记录。
-
-真实来源验证（2026-10-22 23:54 至 2026-10-23，Asia/Shanghai）：
-
-- `uv run python scripts/verify_model_sources.py --rounds 8 --analyze-one` 实际退出 0。
-  HF 八轮均 success：新增 62、更新 5、重复 35、失败 0；默认全部 15 个扫描组有成功记录。
-  语言/推理、代码、多模态理解、OCR 均有实际模型样本；六个组织查询均成功且已有相应模型入库。
-  Google AI 新增 20、NVIDIA 新增 30，均 success；这十轮合计新增 112 条，711 → 823。
-- 验证程序逐条核对原有 711 个资讯 ID 及收藏/已读状态保留，Hub 模型没有把创建时间写为官方发布日期。
-  报告保存于忽略的 `.runtime/batches-1-2-verification.json`，不生成虚构业务数据。
-- 真实中文模型任务 `78823c68-6af1-474c-9cea-84eba3a174ef` 为 success。
-  分析 `whrrr/DeepSeek-OCR`，得到中文标题/摘要/证据说明，原文保持；摘要明确该用户名与
-  DeepSeek 官方的关系未确认。成功记录再次提交返回 409，没有重复分析。未宣称全部模型已生成中文解读。
-- GitHub 仅针对新代码模型/OCR 方向进行一次真实扫描，随后恢复原范围。任务
-  `f9365c9c-97b5-426f-8a08-2a554de6962d` 新增 24、重复 10、过滤 3、失败计数 1；
-  上游返回 `incomplete_results`，任务和验证脚本分别为 partial / 非零退出，不能算完整成功。
-  已获取的项目与版本保留；默认仍是原年龄/规模策略与真实增长算法。
-- 原 HF 博客与数据集复查均 success，分别新增 1 / 1、重复 29 / 19、失败 0；
-  当前状态恢复正常，历史网络失败任务保留。上述验证后数据库合计 849 条资讯。
-- 最终生产构建后重启正常后台服务，主页 HTTP 200，健康检查为 ok / postgresql / scheduler=true。
-  15 个来源保留，GitHub/HF 采集范围均恢复原默认，两个发现来源自动开启、间隔 60 分钟；
-  模型请求标识仍为 `volcengine/deepseek-v4.1-flash`，模型推荐分区返回 6 条真实记录。
-  重启后模型筛选返回 91 条已存记录（包含历史重算识别的官方公告），不以该数量作为固定预期。
-- 历史技术重算已在受控停调度状态应用于 823 条记录，最后重复预览为 0 个变更。
-  只重算规则/元数据，不访问 LLM；原始版本和用户状态保留。预览事务不自动提交的回归已覆盖。
-- 微软 AI RSS `https://blogs.microsoft.com/ai/feed/` 实际返回 410，未启用；微软 Hub 组织已接入。
-  Anthropic 仍无已核验稳定官方订阅，未创建自动任务。组织认证不等于模型性能、许可或 API 可用性的独立核验。
-
-浏览器连接实际数据库，验证全部 30 项偏好保存/刷新、未来主题未激活、模型主题和发布团队筛选、
-空结果与有结果、原文/模型卡链接、详情、采集范围保存/恢复、旧收藏/已读/项目查询和设置。
-用例在 finally 恢复偏好、采集范围、已读等状态；控件测试期间临时在进程环境关闭调度，
-不修改 `.env` 的调度配置。模型页加入三个桌面窗口的字号、对比度与溢出检查。
-已查看 `.runtime/desktop-all-topics.png`、`desktop-model-detail.png`、`desktop-model-feed.png`、
-`desktop-model-sources.png` 和 `ui-desktop-{1024,1440,1920}-models.png` 的真实页面截图。
-
-实现中发现的关联边界已修正：明确不同的模型 ID 即使正文相同，也不能触发文本相似合并；
-旧相似链接在推荐压缩时同样受此限制。辅助函数放在现有 similarity 模块，避免 model_info / normalizer
-循环导入；修复后完整后端测试通过。列表排序文案标明「发布 / 收录」，不将收录时间宣传为官方发布。
-
-该轮覆盖仅为有界查询和当时窗口：15 个扫描组成功不等于每个组织/任务/排序组合或全部历史已覆盖。
-某些模型卡因预算未读或上游缺失只保留元数据；没有下载/运行权重，也没有验证其宣称性能。
-当时 B3–B8 的标签注册不是专项接入，B3 后续结果见本文开头。Windows 原生、长期连续运行及实际 7 天 Stars 基线仍需独立验收。
-
-## 工作台视觉升级验收（2026-10-22，B1/B2 之前）
-
-本轮只修改前端展示和对应测试、文档，保留后台运行与实际数据库。没有修改采集、
-Stars 计算、推荐排序、模型配置和数据库结构，没有重跑后端测试或主动触发收费模型验证。
-
-| 检查 | 实际结果 |
-| --- | --- |
-| 前端构建 | TypeScript / Vite 成功；2127 个模块；最终构建 2.21 秒 |
-| 单元测试 | Vitest 7 passed，1.45 秒 |
-| 浏览器联调 | Playwright 11 passed，14.8 秒，仅桌面 Chromium |
-| E2E 类型 | 对新增视觉与修改的工作台测试执行 strict TypeScript 检查，通过 |
-| 代码格式 | 修改的前端文件 Prettier 检查通过 |
-| 页面排版 | 1024/1440/1920 × 1000，七个导航页面无页面级横向溢出，标题与操作区未重叠 |
-| 文字检查 | 实际 body 16px、主标题 30px、项目标题 18px；选定标题、摘要、辅助信息和状态的对比度均达到 4.5:1 |
-| 网格 | 真实项目库在三个窗口分别为 2、3、4 列；有单项目时利用整行宽度 |
-
-原有用例仍验证真实查询、主题/来源筛选、分页、详情、Stars 历史、收藏/已读与刷新持久化、
-来源启停和研究偏好。设置提交核对实际请求与数据库外的设置读回：后台空闲时显示保存成功；
-模型运行时必须明确显示 HTTP 409 拒绝原因，不能显示假成功，也不能改变原配置。
-
-新增用例覆盖七个页面的计算样式、选定文字对比度、卡片列数与溢出，另通过仅在浏览器内
-拦截请求验证加载、空推荐、空来源、503 错误及重新加载恢复。夹具不写入业务数据库。
-截图使用真实后端记录，已实际查看推荐、项目库、资讯库、来源、设置及详情等页面。
-当前截图保存在忽略的 `.runtime/ui-desktop-*` 和 `.runtime/desktop-*`，不新增手机产物。
-
-测试过程中发现的两项测试假设已修正：
-
-- HashRouter 切页可直接使用 TanStack Query 的新鲜缓存，不能断言每次必定有新 HTTP 请求。
-  视觉用例现在为每页加载独立文档后等待对应响应，不增加固定等待或放宽超时。
-- 后台分析期间原有设置测试一律期待保存成功，与既有锁保护冲突。现在校验真实响应：
-  只允许成功或精确的「分析任务运行时不能修改模型配置」409，其他错误仍失败；两种路径均
-  验证提交内容不含密钥、配置读回一致。没有暂停后台任务或绕过保护机制来通过测试。
-
-限制：此处是桌面 Chromium 的选定文字与交互检查，不代表完整无障碍认证或其他浏览器
-逐一验收；真实采集结果会随后台任务更新，不将截图中的记录数写成固定业务预期。
-
-## 增长动量重构验收（2026-10-22，视觉升级前）
-
-- 后端 75 项测试通过，新增小项目快速增长超过大项目、老项目真实加速回榜、最近减速不回退
-  到旧热度、未知/零/负增长、UTC 日窗口、过期和缺失证据、搜索分组及跟踪优先级等回归。
-  官方历史更新不会制造累计快照或重复触发成功文章的分析。
-- 前端 Vitest：7 passed（1.56 秒）；TypeScript / Vite 生产构建通过。
-- 桌面 Playwright：7 passed（7.7 秒），验证增长/新项目/全部范围、指标、检索、分页、
-  收藏、来源和设置。初次 6 passed / 1 failed 是旧测试假设搜索词必须出现在标题：
-  实际新发布说明在正文命中 vllm。改为核对 API 全文命中和真实首条标题，完整复测通过。
-- Ruff check 和 59 个 Python 文件格式检查通过。真实隔离 PostgreSQL 全量迁移与
-  pgvector 0.8.1 查询通过；业务库已增量升级到 `8ac491d20e63`。
-- 真实调用官方 Search、Repositories、Releases、Contents、Stargazers History API。
-  任务 `70c48834-50ed-4a0e-b5f6-a256833c0e51` 新增 26、重复 13、规则过滤 6、失败计数 1。
-  失败原因是上游搜索 `incomplete_results`，任务状态如实为 partial，脚本非零退出；
-  不能宣称这轮完整采集成功。已经获取的项目、发布、历史与本地快照均保存。
-- 当时 57 个技术项目中有 1 个增长异动、4 个近 30 天新项目。首页显示 1 个异动和另外
-  3 个观察候选，跨分区不重复；已有可见项目资讯 ID 均保持不变。
-- 实际例子：Generated-Computers/Locals 累计 195 Stars，官方 UTC 本日截至
-  2026-10-22 13:17:33 UTC（北京时间 21:17:33）记录 55 次获星，约 4.14/小时，
-  为此前 6 个完整 UTC 日平均速度的 4.69 倍。这是官方日获星，不能说成滚动 24h 净增。
-  记录保存在本机 `.runtime/momentum-check.json`，不是生产演示数据。
-- 真实备份恢复包含 606 条资讯、914 个原始版本、66 个候选仓库、98 条本地快照；
-  10 张业务表恢复计数一致，详情见 backup-recovery.md。
-- 仍有限制：官方搜索与分页覆盖有界，Stars 变化不证明技术质量；API 历史可能延迟或缺失。
-  本地真实 24h/7d 连续窗口及长期运行效果仍待持续观察，本轮没有额外执行 LLM 付费验证。
-
-## 手机界面清理验收（2026-10-22）
-
-- 删除 10 张手机截图、7 处手机/平板布局断点、弹窗手机样式和移动视口设置；未新增项目文件。
-- 扫描项目源码与本机产物，没有剩余手机专用文件或移动端样式分支；保留桌面宽屏及无障碍样式。
-- TypeScript / Vite 生产构建通过；前端单元测试 7 passed（1.48 秒）；仅桌面 Playwright
-  7 passed（7.2 秒），覆盖推荐、检索、分页、详情、收藏、来源和设置。
-- 本轮未修改后端或数据库结构，未重跑后端及外部服务采集测试。启动原有本地 PostgreSQL
-  和后台服务后完成桌面联调，入口仍为 `http://localhost:8000`。
-
-## 技术情报推荐验收（2026-10-22，增长重构前）
-
-- 按用户明确的使用范围，当前仅验收本机电脑端，Playwright 默认只运行桌面 1440x1000。
-- 后端 `uv run pytest -q`：60 passed（3.86 秒）；Ruff check 与 56 个 Python 文件格式检查通过。
-  覆盖去重、真实快照时间窗口、未知/零/负增长、HN 热度排序、来源隔离、模型过滤后移出推荐，
-  并确认被过滤项目的原文和快照仍保留。
-- 最终前端 Vitest：7 passed（1.03 秒）；TypeScript / Vite 生产构建通过。
-- 最终桌面 Playwright：7 passed（6.8 秒），包括连续切换搜索/排序和项目翻页的真实接口验证。
-- 本轮较早的 Playwright 结果为 14 passed（12.9 秒），当时包含桌面和手机。
-  后续按用户要求删除手机测试配置；以下覆盖范围仍用于桌面验收。
-  验证五个推荐分区、技术主题、项目检索/排序、Stars 历史、收藏/已读、研究偏好持久化、
-  X / Reddit 入口移除，并回归原有资讯、来源、任务和设置功能。
-- 首次本轮浏览器结果为 12 passed / 2 failed：项目搜索框和提交按钮同名，测试定位不唯一。
-  改为按 textbox 角色精确定位，完整重跑 14 项通过，没有跳过失败用例。
-- 随后新增分页检查时再次发现连续清空搜索并切换排序会带回旧查询。请求记录确认问题后，
-  保存尚未渲染完成的最新筛选参数，避免路由更新覆盖；同时复用现有箭头分页组件修正文字挤压。
-- 真实隔离 PostgreSQL 数据库执行全部 Alembic 迁移，pgvector 0.8.1 查询与调度锁验证通过。
-  当前业务库迁移为 `4f6a329b8102`，新增项目、快照、技术规则与来源指标字段。
-- 原有 247 条资讯继续保留。两轮真实 GitHub 采集后，共 38 个候选仓库、36 个技术项目、
-  48 条真实 Stars 快照；第二轮新增 47 条项目/发布记录、重复 10 条，失败 0。
-  首轮项目的资讯 ID 在第二轮保持一致，指标更新不重复创建资讯。
-- 13 个来源均已实际采集成功；当时共有 509 条资讯、734 个原始版本。HN 评论为真实样本，
-  样本数与平台报告的总评论数分开显示。HF 模型/数据集、arXiv LG/CL/CV 均返回实际记录。
-- 真实火山网关模型 `volcengine/deepseek-v4.1-flash` 分别分析 DeepSpeed 项目、HN Agent
-  沙箱讨论、arXiv Transformer 论文，3 个任务均 success，中文标题/摘要已持久化。
-  逐条对照原始标题、正文和链接均未改变；成功记录再次提交返回 409，调用次数未增加。
-  本机记录为 `.runtime/technical-llm-check.json`。
-- 删除 X 来源 1 个、历史失败任务 1 条、资讯 0 条；私有 `.env` 的 X 凭据已删除，旧库恢复
-  后的停用平台会在启动时禁用。其他来源和已有火山模型配置继续使用。
-- 120 个可提交文件扫描没有发现本机配置中的完整密钥；`.env` 权限为 0600。
-  私有比较确认 LLM 地址、密钥和请求模型与用户授权的 OpenCode 火山网关配置一致。
-- 10 张业务表的实际备份恢复通过，详见 `docs/backup-recovery.md`；恢复只创建随机测试库。
-- 当前所有项目的 24h / 7d 增长均为未知，因为真实历史窗口尚未形成。窗口边界、未知、零、
-  负增长、陈旧/未来样本由离线夹具验证，不宣称已观察到真实长期增长。
-- GitHub 使用官方搜索/仓库/发布 API，本地推荐不是官网 Trending 名次。
-  Anthropic 常见官方 RSS 地址实际返回 404，未接入未经确认的替代来源。
-
-桌面截图：`.runtime/desktop-recommendations.png`、`.runtime/desktop-projects.png`、
-`.runtime/desktop-stars-history.png`。长期无人值守、实际 24h / 7d 增长、
-Windows 原生安装启动与未配置的向量服务仍未通过本轮实机验收。
-
-## X 与来源调整复测（2026-10-22，历史记录，功能已移除）
-
-以下仅保留当时的验证证据；其中 X 脚本、界面和凭据均已删除，不再适用于当前版本。
-
-- 后端 `uv run pytest -q`：55 passed（3.38 秒）。覆盖官方令牌请求格式、拒绝重定向、
-  凭据错误脱敏、私有配置、分页高水位、空结果、401/402/403/429、部分失败重试与去重、
-  默认手动调度、查询修改及 Reddit 接口移除。X 纯文本中的尖括号不被 HTML 清洗误删。
-- 前端 Vitest：5 passed（1.33 秒），包括查询保存和游标重置提交真实 API 契约的夹具测试。
-- Playwright：10 passed（9.1 秒），桌面 1440x1000 / 手机 390x844。
-  浏览器连接真实后端，验证 X 配置显示、开关刷新持久化、X 添加表单及 Reddit 入口消失，
-  同时回归检索、收藏/已读、详情、来源管理和系统设置。
-- 初次浏览器验证为 6 passed / 4 failed：原文标题与对话框标题同名时，旧测试选择器不唯一；
-  X 查询输入的说明文字被误包含在字段名称中。修正标题层级定位与表单 label/description，
-  重新运行全部 10 项通过，没有跳过失败用例或删除断言。
-- TypeScript/Vite 生产构建、Ruff 静态检查及 51 个 Python 文件格式检查通过。
-- 本机 PostgreSQL 实际删除 Reddit 来源 1 个、任务 1 条，相关资讯 0 条；
-  API 不再返回 Reddit，私有 `.env` 中删除 `FS_REDDIT_TOKEN`，新启动不会重新创建来源。
-- X 消费者密钥按用户授权写入忽略的 `.env`，权限为 0600。109 个可提交文件及后端日志
-  扫描未发现完整 X/LLM 密钥；设置 API 不返回完整密钥，只返回是否配置。
-- 真实 `POST https://api.x.com/oauth2/token` 返回 HTTP 403、错误码 99，响应明确为凭据无法
-  验证。可能的图片字符识别或失效凭据原因尚不能确定；不能据此判断账户余额或读取权限。
-- `uv run python scripts/verify_x.py` 实际退出码 1；任务
-  `b2f44d9a-f345-433e-be5e-01cc7a1c8c98` 状态 failed，新增 0、重复 0、失败 1，
-  X 已存资讯 0。中文授权错误持久化并在来源和任务页显示；没有创建模拟帖子。
-- 当时 X 来源 `x-openai`：查询 `from:OpenAI -is:retweet`、每页最多 10 条，自动关闭。
-  后续按用户要求移除，不再配置或尝试调用。
-- 当时的桌面 X 截图：`.runtime/desktop-x-sources.png`。
-  浏览器测试临时停用 X 来源后切换自动状态，最后恢复，避免测试触发付费 API 读取。
-- 最终重启后 `/api/health` 为 ok / postgresql，scheduler 为 true；原有 7 个来源均启用，
-  Reddit 来源为 0，X 启用但 automatic 为 false，真实 X 资讯仍为 0。火山网关地址、
-  密钥与请求模型通过私有比较确认与用户指定 OpenCode 配置一致，没有输出比较值。
-  Windows PowerShell 实际请求 `http://localhost:8000/api/health` 返回 ok。
-
-该历史轮次没有修改数据库结构，使用现有 JSON 字段保存 X 配置/游标。未重新运行原本已经通过的
-全量迁移、备份恢复或真实 LLM 付费测试；它们的前次证据仍见下文。
-
-## 中文阅读与火山网关复测（2026-10-22）
-
-- 从用户指定的 OpenCode 配置读取「火山AI网关」，使用请求模型标识
-  `volcengine/deepseek-v4.1-flash`；`DeepSeek-V4.1-Flash1017` 是配置中的显示名。
-  没有修改 OpenCode 配置，没有在输出中打印密钥。
-- 一次独立接口验证返回有效中文标题与摘要，服务端报告输入 268、输出 674 词元。
-  这条验证消息未作为新闻写入资讯表。
-- `uv run python scripts/verify_chinese.py --batches 4`：4 个真实分析任务均 success，
-  每批 5 条，首页 20 条中文标题/摘要已持久化；原始标题和正文逐条对照保持一致。
-  成功条目再次请求分析返回 409，调用审计记录数不增加。
-- 首条资讯前两次请求超时，第三次请求成功；失败与成功尝试均被保留，原文未丢失。
-  这是本次服务的真实重试观察，不是伪造故障或额外注入的模拟响应。
-- 全部 20 条共记录 26 次分析尝试：20 次成功、3 次超时/连接失败、3 次格式或中文校验失败。
-  各条最终均成功。没有保留失败响应全文，不能进一步断言具体哪个返回字段有误。
-  本机网关请求超时随后从 60 调整为 120 秒，密钥、模型及 JSON 模式保持不变。
-- 运行中服务的 `scripts/probe_llm.py` 也实际通过：任务 `cc4e0084-965a-4d4b-8665-1e43c464d1c6`
-  为 success，退出码 0；这条接口验证不新增新闻。
-- 后端 pytest：40 passed（3.69 秒）；前端 Vitest：4 passed（1.33 秒）；
-  Playwright：8 passed（7.1 秒），覆盖桌面和手机、中文标题默认显示及原文展开。
-- TypeScript/Vite 构建、Ruff 检查和 47 个 Python 文件格式检查通过。
-  新库完整迁移、pgvector 查询及调度锁验证通过；主库已升级到 `e62bc8c7a103`。
-- 模型结果入库后的新备份恢复通过：244 条资讯、326 个原始版本、29 个任务、26 次分析尝试，
-  新库恢复后 8 张业务表计数一致。配置匹配检查确认地址、密钥和模型与指定网关一致，
-  `/api/settings` 响应不包含完整密钥。
-- 重启后首页 20 条中文结果保持，模型配置与 120 秒超时生效，自动调度恢复并已开始下一批。
-  Windows PowerShell 再次访问主页得到 200，健康状态 ok，模型已配置、调度已开启。
-- 中文处理证据在 `.runtime/chinese-check.json`，桌面截图在 `.runtime/desktop-feed.png`。
-  这些本机忽略文件可重新生成，不包含接口密钥。
-- 中文摘要是模型概括，不是全文逐句翻译；模型质量仍需阅读核对。向量服务、Reddit、
-  Windows 原生完整启动和长期稳定性仍未完成实测。
-
-## 阶段 0（2026-10-22）
-
-六个候选仓库均实际克隆；审阅核心文件但未执行上游应用/测试。
-Docker socket 无权限，Compose 不可用；用户态 PostgreSQL 18.6 已启动。
-
-## 阶段 1（通过）
-
-- `uv run pytest -q`：6 passed，0.13 秒。
-- `npm --prefix frontend run build`：TypeScript 与 Vite 7.3.7 构建成功。
-- `uv run alembic upgrade head`：真实 PostgreSQL 初始迁移成功。
-- 第一轮实际采集失败：WSL 直连连接被重置，任务正确记录 failed。
-  增加环境代理支持和公网 IP 固定连接后，Fetcher 与后续完整采集均已通过。
-- npm 依赖扫描发现旧测试工具问题，升级 Vitest 后 npm audit 为 0 漏洞。
-- `scripts/smoke_live.py` 两轮通过：新增 30 / 0，第二轮条件请求 304，记录 ID 不变。
-- 实际停止并重新启动 uvicorn，API 仍返回 30 条；原记录 ID 保留。
-- Chromium 1440x1000：20 条真实记录、0 pageerror；390x844 无横向溢出。
-  截图发现 WSL 无中文字体，已在用户目录安装 Noto CJK，后续截图中文字已正常显示。
-
-## 阶段 2（通过）
-
-- `uv run pytest -q`：10 passed。包含 HN 单条故障、GitHub 条件请求、并发任务提交、
-  来源隔离、重复计数、禁用来源、重启恢复。SQLite 夹具使用单采集 worker；真实并发另测。
-- `scripts/check_sources.py`：真实 PostgreSQL、3 个采集 worker，7 个来源均 success。
-  Hugging Face 条件请求 0 新增；OpenAI、DeepMind、HN、vLLM、LangChain、arXiv 各新增 30。
-  初始共 210 条。运行时 API 可正常查询。`.runtime/source-check.json` 保存最近一次复测结果，
-  后续运行会更新该文件，不能将当前文件当作初次 210 条的快照。
-- 实际源请求受网络和 feed 窗口变化影响，不保证将来的新增数量相同。
-
-## 阶段 3 初始验收（当时未配置模型）
-
-阶段 3：`uv run pytest -q` 为 20 passed（1.70s）；`uv run python scripts/integration_db.py`
-在随机命名的隔离 PostgreSQL 数据库执行完整迁移、插入测试向量、查询 pgvector 0.8.1
-余弦相似度并验证关联和双来源记录保留，成功后清理自己的测试库。
-LLM HTTP 使用 MockTransport 及可控 Provider 夹具；没有真实模型调用成功的声明。
-缺少本地模型凭据时 `/api/analyze` 明确返回 409，不生成假摘要和假分析任务。
-
-## 初始化交付复测（2026-10-22，模型接入之前）
-
-| 检查 | 实际结果 |
-| --- | --- |
-| 后端单元/API/任务测试 | `uv run pytest -q`：37 passed，2.91 秒 |
-| Python 静态检查 | Ruff check 通过；43 个 Python 文件 format 检查通过 |
-| Python 依赖 | `uv lock --check` 通过；`uv run pip check` 无冲突 |
-| 前端单元测试 | Vitest：3 passed |
-| 前端构建 | TypeScript 与 Vite 构建通过 |
-| 浏览器真实联调 | Playwright：8 passed，6.4 秒；1440x1000 / 390x844 |
-| npm 依赖扫描 | `npm audit`：0 个已报告漏洞（不等于无安全风险） |
-| 真采集 | 7 个公共来源全部 success；244 条资讯；最近轮次 vLLM 重复 30、失败 0 |
-| 数据库集成 | 新库执行全部 Alembic 迁移、pgvector 0.8.1 余弦查询、双来源记录保留、第二调度实例拒绝与锁丢失检测通过 |
-| 备份恢复 | 244 条资讯、326 个原始版本、24 个任务；新库恢复后 8 张业务表计数一致 |
-| 后台服务 | WSL 启动、停止、再次启动及 HTTP 健康检查通过；PostgreSQL 和历史资讯保持 |
-| Windows 静态检查 | 实际 PowerShell 5.1 解析 Start.ps1 通过；Windows Docker Compose v5.5.1 配置解析通过 |
-| Windows 访问 WSL | PowerShell 请求 `http://localhost:8000`：主页 HTTP 200、FrontierSignal 标题存在、API 状态 ok / postgresql |
-| 真实 LLM 探测 | 未配置，脚本退出码 2；没有真实分析或向量服务成功结果 |
-
-浏览器用例覆盖真实资讯检索、来源筛选、分页、详情、原始记录、来源图片加载、收藏/已读与
-刷新持久化、来源开关、任务历史、非敏感设置保存和页面横向溢出检查。
-运行前须有真实采集记录；用例会恢复被修改的收藏、已读和来源状态，不写入模拟新闻。
-桌面截图位于 `.runtime/desktop-feed.png` 及对应详情/来源/设置截图。
-这些是本次机器的忽略文件，重新运行用例可生成，不能用于证明未来的外部服务可用性。
-
-最终联调中发现并修正了两项问题：
-
-- vLLM 长发布说明触发 simhash 2.1.2 / NumPy 2 的 uint8 权重溢出，3 条被计为失败。
-  类型提升补丁通过长重复文本精确指纹与短文本兼容回归测试，并在 30 条真实 vLLM 文本
-  （最长 49,489 字符）上验证；再次真实采集 30 条重复、0 失败，原部分失败任务仍可追踪。
-- 收藏 E2E 点击后立即读取数据库存在时序竞争；已改为等待 PATCH 响应和列表更新，再独立
-  查询持久化结果。没有跳过断言或用固定等待掩盖失败；桌面与手机复测均通过。
-
-当时未验证：真实 LLM/Embedding/Reddit、Windows 原生安装启动、Docker Desktop 容器运行、
-X 采集、长期无人值守、海量数据性能。模型失败/重试等由受控 HTTP/Provider 夹具覆盖，
-不冒充真实供应商调用。模型现状以上面的最新复测为准。Windows uv 当时未安装，Docker Desktop 引擎未启动。
-
-## 命令（PowerShell 与 WSL 通用）
+先完成依赖安装、数据库启动和迁移。代码结构：
 
 ```text
-uv sync --locked
-uv run pytest -q
-uv run ruff check backend tests scripts
-npm --prefix frontend ci
-npm --prefix frontend test
-npm --prefix frontend run build
-uv run python scripts/integration_db.py
-uv run python scripts/smoke_live.py
-uv run python scripts/check_sources.py
-uv run python scripts/verify_discovery.py
-uv run python scripts/verify_model_sources.py --rounds 8
-uv run python scripts/verify_model_sources.py --batch 3 --rounds 25
-npm --prefix frontend exec -- playwright install chromium
-npm --prefix frontend run test:e2e
-uv run python scripts/backup.py --verify
-uv run python scripts/probe_llm.py
+backend/frontiersignal/   采集器、分析、存储、推荐、调度与 API
+backend/alembic/          数据库迁移
+frontend/src/            React 工作台
+frontend/e2e/            桌面浏览器测试
+tests/                   Python 测试与夹具
+scripts/                 安装、运维及真实服务验证工具
+docs/                    使用、架构与验收文档
 ```
 
-`smoke_live.py` 访问 127.0.0.1:8000，触发两轮真实采集并比较记录 ID。
-`check_sources.py` 汇总所有来源结果，任何任务未成功时返回非零退出码。
-`verify_discovery.py` 触发项目发现、HN、HF 模型/数据集和新增论文来源，检查真实任务与推荐。
-`verify_model_sources.py` 轮换 HF 模型并采集 Google AI / NVIDIA RSS，核对旧 ID/状态、各主题样本和去重。
-默认不调用 LLM；加 `--analyze-one` 会对一条实际模型执行分析并检查重复调用拒绝，使用既有服务用量。
-来源任务有失败/部分成功、样本缺失或校验失败时返回非零；报告写入 `.runtime/batches-1-2-verification.json`。
-选择 `--batch 3` 仅轮换 HF，检查图像/视频/音频及所有创作查询组，保存 `.runtime/batch-3-verification.json`；
-`--analyze-each` 逐类分析一条真实记录，默认不开启。缺少符合条件的记录时明确失败，不报告假成功。
-B3 当时的七主题配置以 25 轮完成覆盖；当前已扩为 15 主题且采用新的请求分配，不沿用该保证。
-本轮优先使用 `uv run python scripts/verify_expansion.py` 做有界检查，无需反复运行旧版长轮次验证。
-这些命令会联网并保存真实记录；不在普通离线测试中自动运行。
-`integration_db.py` 只清理自己创建的随机测试库；备份恢复也只写新库。
-`probe_llm.py` 在未配置或已有模型任务占用时返回 2，真实请求失败返回 1，结构验证通过才返回 0。
-不要把真实来源可用性当作离线 CI 的必要条件。Playwright 首次需要安装 Chromium；
-Windows 和 WSL 的浏览器与 node_modules 应分别安装，不共享依赖目录。
+开发前阅读 [AGENTS.md](../AGENTS.md) 和 [项目计划](../PROJECT_PLAN.md)。Python 依赖使用 `uv.lock`，前端使用 `package-lock.json`；不要在 Windows 与 WSL 之间共享虚拟环境或 Node 依赖目录。
+
+为了避免热更新期间自动采集或产生 LLM 用量，可以在开发环境将 `FS_SCHEDULER_ENABLED=false`，调试结束后恢复。手动任务仍会执行，数据库也仍是真实数据库。
+
+终端一，启动后端：
+
+```text
+uv run uvicorn frontiersignal.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+终端二，启动前端：
+
+```text
+npm --prefix frontend run dev
+```
+
+访问 `http://localhost:5173`。Vite 将 `/api` 转发到 8000。生产使用前执行 `npm --prefix frontend run build`，再按日常方式启动后端，访问 8000。
+
+不要同时运行后台启动器和前台开发后端；调度要求单 worker。调整端口时还需要同步 Vite 代理与允许的 Origin。
+
+## 按变更选择检查
+
+| 修改内容                 | 必要检查                                                |
+| ------------------------ | ------------------------------------------------------- |
+| 文档                     | 链接与路径、命令对应的脚本和参数、默认值、Markdown 格式 |
+| 标准化、去重、窗口或推荐 | 相关 pytest 用例、Ruff；数据库行为另做集成检查          |
+| 前端逻辑或视觉           | Vitest、TypeScript / Vite 构建；受影响的桌面页面或 E2E  |
+| 数据模型或迁移           | PostgreSQL 隔离集成、迁移检查和必要的备份恢复演练       |
+| 采集器或模型兼容性       | 可控 HTTP 夹具；另选有界真实服务验证，分别报告结果      |
+
+外部接口不稳定不应导致离线测试依赖真实网络。不要用夹具结果证明实际来源可用，也不要将短测当作 24 小时或 7 天观察。
+
+## 离线检查
+
+依赖已安装后，以下检查不需要真实来源或付费模型：
+
+```text
+uv run pytest -q
+uv run ruff check backend tests scripts
+npm --prefix frontend test
+npm --prefix frontend run build
+```
+
+可以按受影响文件缩小 pytest 范围。测试覆盖标准化、URL、精确去重、数据库交互、模型失败重试、任务状态、推荐窗口与核心前端交互。
+
+## PostgreSQL 集成
+
+```text
+uv run python scripts/integration_db.py
+```
+
+需要可连接的 PostgreSQL、pgvector 和创建数据库权限。脚本创建随机名称的独立数据库，验证迁移及数据库行为，仅清理自己创建的测试库。它不替代主库备份。
+
+## 浏览器验证
+
+先安装 Chromium，启动 8000 端口的应用并准备已采集数据：
+
+```text
+npm --prefix frontend exec -- playwright install chromium
+npm --prefix frontend run test:e2e
+```
+
+按需运行单个测试文件：
+
+```text
+npm --prefix frontend run test:e2e -- discovery.spec.ts
+```
+
+测试读取实际 API，部分用例会修改并恢复收藏、已读、偏好、来源或设置。它们不是只读检查，空库可能不满足用例前提。只保留桌面测试，默认视口为 1440 × 1000；失败截图与追踪在被忽略的测试输出目录。
+
+## 真实服务验证
+
+运行前确认后端已启动、来源可访问，并了解脚本的写入或费用影响。需要避免自动任务干扰时，临时暂停调度并重启，结束后恢复原设置。
+
+| 命令                                        | 行为与前提                                               |
+| ------------------------------------------- | -------------------------------------------------------- |
+| `uv run python scripts/probe_llm.py`        | 一次真实模型接口探测，消耗服务用量；不创建新闻           |
+| `uv run python scripts/smoke_live.py`       | 触发两轮真实采集，保存内容并检查重复与 ID                |
+| `uv run python scripts/check_sources.py`    | 触发来源采集并检查任务结果，写入真实资讯                 |
+| `uv run python scripts/verify_discovery.py` | 检查项目发现、HN、HF 与论文链路，产生采集记录            |
+| `uv run python scripts/verify_expansion.py` | 有界扩展方向验证，临时修改来源范围后恢复；默认不调用 LLM |
+| `uv run python scripts/backup.py --verify`  | 生成备份并恢复到随机验证库，核对后清理该验证库           |
+
+`verify_expansion.py --analyze-one` 会额外分析一条真实内容并产生模型用量。长轮次模型扫描还有 `verify_model_sources.py`，不是每次提交都必须执行的检查；其参数可用 `--help` 查看。
+
+失败、部分成功、样本不足和未扫描需要如实记录。历史脚本中的轮次数只适用于当时目录和预算，不能保证当前所有主题都被覆盖。
+
+## API 调试
+
+应用启动后可访问 `http://localhost:8000/docs` 查看 OpenAPI，`/openapi.json` 为接口契约。
+
+写入接口要求请求头 `X-FrontierSignal: 1`；只允许配置中的本机 Origin。Swagger 页面不会自动添加该自定义头，写操作调试需使用能显式设置请求头的客户端。这里的限制不是远程账户认证，不应据此公开部署。
+
+## 验证记录
+
+历史功能验收、真实服务调用和备份恢复证据见 [历史验收记录](validation-history.md)。2026-10-23 的 B4–B8 记录包含 138 项 pytest、10 项 Vitest、7 项选定桌面 E2E 和 13 张业务表恢复核验；这些是当次结果，并非每次文档修改都重跑的测试。
+
+本次文档整理的检查结果另记于该文档，不刷新或冒用此前业务测试结果。Windows 原生完整部署、可选 Embedding 实际服务以及持续 24 小时 / 7 天观察仍按各自证据验收。

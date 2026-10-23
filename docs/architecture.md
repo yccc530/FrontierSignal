@@ -1,5 +1,7 @@
 # 架构
 
+[返回项目首页](../README.md) · [开发与测试](testing.md) · [数据来源](data-sources.md)
+
 模块化单体，单进程单 worker。React 通过 `/api` 访问 FastAPI，禁止前端连接数据库。
 
 ```text

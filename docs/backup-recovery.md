@@ -1,39 +1,94 @@
 # 备份与恢复
 
-备份只包含数据库，不包含 `.env`。模型密钥和数据库连接配置应单独保存在用户自己的安全位置。
-不要提交 `.env`、`.runtime/` 或 `backups/`。
+[返回项目首页](../README.md) · [更新版本](installation.md#更新版本) · [故障排查](troubleshooting.md)
 
-PowerShell / WSL 通用：
+## 需要保存什么
 
-```powershell
+| 内容                                   | 保存方式                                          |
+| -------------------------------------- | ------------------------------------------------- |
+| 资讯、原始版本、分析记录、来源配置     | 数据库备份                                        |
+| 收藏、已读、项目、Stars 历史、推荐设置 | 数据库备份                                        |
+| 模型密钥、数据库连接、代理、研究偏好   | 单独妥善保存 `.env`，不包含在数据库备份中         |
+| 使用的程序版本                         | 记录 `git rev-parse HEAD`，便于恢复时核对迁移版本 |
+
+不要提交 `.env`、`.runtime/` 或 `backups/`。迁移或升级前建议创建一份备份，并把备份文件另存到独立存储位置。
+
+## 创建备份
+
+保持 PostgreSQL 运行，在项目根目录执行，PowerShell 和 WSL 通用：
+
+```text
 uv run python scripts/backup.py
+```
+
+成功后输出备份位置、SHA-256 与表计数。`backups/` 中生成同名的两个文件，需一起保存：
+
+```text
+frontiersignal-<UTC时间>.dump   PostgreSQL 自定义格式备份
+frontiersignal-<UTC时间>.json   校验和、备份时间与表计数
+```
+
+默认文件名使用 UTC，可能与本地日期不同。已存在的输出文件不会被覆盖。备份使用一致的数据库快照，不要求先停止应用；导出的数据与清单计数来自同一个快照。
+
+指定文件名时可以使用：
+
+```text
+uv run python scripts/backup.py --output backups/before-upgrade.dump
+```
+
+## 验证备份可恢复
+
+```text
 uv run python scripts/backup.py --verify
 ```
 
-工具优先使用 `FS_PG_BIN` 指定的 PostgreSQL 工具目录，其次本次 WSL 用户态安装，
-其次 PATH 中的工具，最后使用 `docker compose exec -T db`。客户端主版本不能低于服务端。
-Windows 下二进制流由 Python 写入文件，避免 PowerShell 文本重定向破坏 dump。
+这个命令会**新建一份备份**，创建随机名称的验证数据库，恢复并比较各业务表记录数，再清理自己创建的验证库。需要 `CREATE DATABASE` 权限，不会覆盖应用数据库。
 
-备份使用导出的 PostgreSQL REPEATABLE READ 快照，pg_dump 和表计数使用同一快照。
-每个 `.dump` 附带同名 `.json`，记录 SHA-256、时间和各表记录数。现存输出路径不会被覆盖。
-`--verify` 实际创建随机名称测试库、恢复、比较全部业务表计数，然后只清理自己创建的测试库。
+当前备份包含 13 张业务表；旧版本备份按照自身 JSON 清单核验，不要求旧备份具有后来新增的表。验证通过代表该次恢复与计数核验成功，不等同于完整业务回归。
 
-恢复到一个**不存在的新数据库**：
+## 恢复到新数据库
 
-```powershell
-uv run python scripts/backup.py --restore backups\frontiersignal-<timestamp>.dump --new-database frontiersignal_restored
+1. 准备配套的 `.dump` 和 `.json`，确认 PostgreSQL 正在运行，账户有建库权限。
+2. 选择一个**尚不存在**的数据库名。把下列文件路径替换为真实文件名：
+
+```text
+uv run python scripts/backup.py --restore "backups/替换为实际文件名.dump" --new-database frontiersignal_restored
 ```
 
-WSL 路径使用 `/`。原始 `.dump` 与 `.json` 必须同时保留。工具拒绝校验和不一致的备份，
-拒绝覆盖已有数据库，不使用 `--clean`，不会自动把应用切换到恢复库。
-验证新库后，停止后端，手动调整 `.env` 的数据库名，执行 `uv run alembic upgrade head`
-升级恢复库到当前结构，再启动后端。旧版 8 表备份仍按其元数据核验；当前备份包含项目与
-Stars 快照及推荐设置、展示记录、运行采样，共 13 张业务表。旧备份仍按各自清单校验。
-必要时运行 `scripts/backfill_technical.py` 预览技术规则重算，
-核对后明确加 `--apply` 才写入；重算不调用 LLM。
-命令调用者需要 CREATE DATABASE 权限；本地 Compose 初始化角色具备此权限。
+3. 检查输出的 `restored_database` 和计数。校验和不一致或目标库已存在时，工具会拒绝继续；恢复失败留下的新库不会自动成为应用主库。
+4. 验证成功后停止后端，将 `.env` 中 `FS_DATABASE_URL` 的数据库名改为 `frontiersignal_restored`。主机、端口和凭据以目标实例为准；若连接由进程环境变量指定，也需相应修改。
+5. 执行迁移并重新启动：
 
-## 已执行的演练
+```text
+uv run alembic upgrade head
+```
+
+6. 检查健康接口、资讯数量、收藏、来源和 Stars 历史。确认完成前保留原数据库和备份。
+
+工具不覆盖已有库、不使用 `--clean`，也不自动切换应用连接。不要用删除数据卷或重建整个 PostgreSQL 实例替代恢复步骤。
+
+## PostgreSQL 工具选择
+
+备份工具按顺序使用：进程环境变量 `FS_PG_BIN` 指定的目录、WSL 用户态安装目录、PATH 中的工具，最后才是项目的 Docker Compose `db` 容器。
+
+默认数据库为 PostgreSQL 18，备份客户端应使用兼容的主版本，不能低于服务端。已有外部数据库不应误用本项目 Docker 容器中的连接，建议显式指定工具目录。例如：
+
+```powershell
+$env:FS_PG_BIN = "C:/Program Files/PostgreSQL/18/bin"
+```
+
+```bash
+export FS_PG_BIN=/usr/lib/postgresql/18/bin
+```
+
+二进制备份由 Python 直接写入文件，避免使用 PowerShell 的文本重定向保存 `pg_dump` 输出。
+
+## 历史恢复演练
+
+下列记录来自开发环境，不包含在仓库下载内容中，也不需要新用户寻找这些文件。更多验证见 [历史验收记录](validation-history.md)。
+
+<details>
+<summary>查看带日期的备份与恢复记录</summary>
 
 2026-10-23 B4–B8 收尾（文件名使用 UTC）：
 `backups/frontiersignal-20261022T211540203373Z.dump`，SHA-256
@@ -83,3 +138,5 @@ SHA-256 `494bbc85940a38b0109dad16639b42d37f96a1456e29f366c8f3b2d72471e0e6`。
 包含 15 个来源、1149 条资讯、1809 个原始版本、319 个任务、958 次分析尝试、7 个分类、
 127 条候选关联、0 个向量、139 个仓库、222 条 Stars 快照。独立恢复库 10 张表计数全部一致，
 只清理本次创建的验证库，没有覆盖应用数据库；模型任务、模态和规格原文随 JSON 保存。
+
+</details>

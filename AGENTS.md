@@ -11,7 +11,10 @@
 - 密钥仅存于被 Git 忽略的本地配置或环境变量。
 - 数据库结构变更必须通过明确、带版本的 Alembic 迁移。
 - 运行相关 pytest、Ruff、前端类型检查/构建和交互测试。
-- 在 docs/testing.md 分别记录真实服务验证与夹具测试结果。
+- docs/testing.md 维护开发与测试方法；docs/validation-history.md 按日期分别记录真实服务与夹具验证结果。
+- README 面向新用户，安装、使用、配置分别放在 docs/installation.md、docs/usage.md、docs/configuration.md。
+  命令必须与脚本一致；本机路径、密钥、样本数与历史验收不得写成所有安装自带的配置或结果。
+  文档修改做链接、参数与格式检查即可；没有代码改动时无需重复付费模型调用或全量采集。
 - 保持 README、PROJECT_PLAN、CHANGELOG 和受影响文档与实现一致。
 - 支持 Windows PowerShell 与 WSL2；应用默认仅绑定本机回环地址。
 - 用户仅在本机电脑浏览器使用；以桌面端为开发和验收目标，不额外开发或测试手机端。

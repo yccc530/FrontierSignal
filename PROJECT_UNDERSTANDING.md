@@ -1,6 +1,8 @@
 # 项目理解
 
-审计日期：2026-10-22，Asia/Shanghai。
+初始审计日期：2026-10-22，Asia/Shanghai。下列环境信息描述开发时状态，不是使用者的安装前提。
+
+面向使用者的说明见 [README](README.md)、[安装指南](docs/installation.md) 和 [使用指南](docs/usage.md)。
 
 FrontierSignal 是个人中文 AI 情报工作台。原始内容与来源可追溯，分析结果有
 模型与处理记录，采集或模型故障不会丢失已有资讯。
@@ -24,7 +26,7 @@ AI 是后续独立处理阶段。未配置模型时，采集结果依然可浏�
 采用 PostgreSQL 主库、pgvector 扩展、Alembic 迁移。SQLite 仅作为隔离单元测试
 后端，不作为生产静默降级。没有现有业务数据库需要转换。
 
-当前进度、已验证功能与未验证边界以 PROJECT_PLAN.md、docs/testing.md 为准。
+当前进度、已验证功能与未验证边界以 PROJECT_PLAN.md、docs/validation-history.md 为准。
 
 当前方向为技术研究者使用的 AI 情报推荐。保留原有来源，默认来源扩展到 16 个：
 GitHub 项目发现、Hugging Face 模型/数据集、arXiv cs.AI/LG/CL/CV、官方博客、HN、固定仓库发布，
