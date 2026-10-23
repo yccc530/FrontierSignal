@@ -166,7 +166,7 @@ async def test_keyword_queries_reject_other_topic_results_and_never_download_wei
             return b"This diffusion implementation supports 1024x1024 resolution.", {}, 200
 
     source = Source(
-        kind="hf_models", config={"discovery_topics": ["image", "llm"]}, cursor={"model_tick": 3}
+        kind="hf_models", config={"discovery_topics": ["image", "llm"]}, cursor={"model_tick": 4}
     )
     # Topic order follows the stable catalog: cycle 1 selects image.
     result = await HuggingFaceCollector(Fetcher()).collect(source)

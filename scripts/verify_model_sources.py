@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
+from frontiersignal.publishers import PUBLISHERS, publisher_authors
 
 
 def wait_run(client, task_id, timeout=240):
@@ -65,6 +66,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--batch", type=int, choices=[2, 3], default=2)
     parser.add_argument("--rounds", type=int, default=8)
+    parser.add_argument(
+        "--publishers",
+        nargs="+",
+        choices=list(PUBLISHERS),
+        help="Only collect HF and verify these publisher accounts; combine with --rounds 2 for batch 1",
+    )
     parser.add_argument("--analyze-one", action="store_true")
     parser.add_argument(
         "--analyze-each", action="store_true", help="Analyze one original per B3 topic"
@@ -74,11 +81,15 @@ def main():
         parser.error("--rounds must be 1..30")
     if args.analyze_each and (args.batch != 3 or args.analyze_one):
         parser.error("--analyze-each requires --batch 3 and cannot combine with --analyze-one")
+    if args.publishers and (args.analyze_each or args.analyze_one):
+        parser.error("Publisher verification does not invoke paid model analysis")
     expected_topics = (
         ["image", "video", "audio"]
         if args.batch == 3
         else ["llm", "coding_models", "multimodal", "ocr"]
     )
+    if args.publishers:
+        expected_topics = []
     report = {
         "at": datetime.now(UTC).isoformat(),
         "batch": args.batch,
@@ -87,6 +98,7 @@ def main():
         "model_samples": [],
         "analysis": None,
         "analyses": [],
+        "publishers": args.publishers,
     }
     try:
         with httpx.Client(
@@ -98,7 +110,7 @@ def main():
             before = records(client)
             report["before_count"] = len(before)
             source_ids = ["hf-models"] * args.rounds
-            if args.batch == 2:
+            if args.batch == 2 and not args.publishers:
                 source_ids += ["google-ai", "nvidia-technical"]
             for source_id in source_ids:
                 submitted = client.post(f"/api/sources/{source_id}/collect")
@@ -161,7 +173,61 @@ def main():
                         }
                     )
             report["coverage"] = client.get("/api/discovery/coverage").json()
-            if args.batch == 3:
+            if args.publishers:
+                for publisher in args.publishers:
+                    filtered = records(
+                        client, content_type="models", publisher=publisher, source="hf-models"
+                    )
+                    report["checks"][f"real_{publisher}_sample"] = bool(filtered)
+                    for author in publisher_authors(PUBLISHERS[publisher]):
+                        samples = [
+                            row
+                            for row in filtered
+                            if row["metrics"]["model"]["id"].split("/")[0].casefold()
+                            == author.casefold()
+                        ]
+                        report["checks"][f"real_account_{author}"] = bool(samples)
+                        if samples:
+                            row = samples[0]
+                            report["model_samples"].append(
+                                {
+                                    "publisher": publisher,
+                                    "account": author,
+                                    "id": row["id"],
+                                    "title": row["title"],
+                                    "url": row["original_url"],
+                                    "model": row["metrics"]["model"],
+                                }
+                            )
+                groups = next(
+                    source["groups"]
+                    for source in report["coverage"]["sources"]
+                    if source["source_id"] == "hf-models"
+                )
+                selected = [
+                    row
+                    for row in groups
+                    if any(
+                        row["id"] == f"publisher:{key}" or row["id"].startswith(f"publisher:{key}:")
+                        for key in args.publishers
+                    )
+                ]
+                report["checks"]["fresh_publisher_scans"] = bool(selected) and all(
+                    row["status"] == "success"
+                    and row["last_scan_at"]
+                    and datetime.fromisoformat(row["last_scan_at"])
+                    >= datetime.fromisoformat(report["at"])
+                    for row in selected
+                )
+                final_runs = {row["id"]: row for row in client.get("/api/tasks").json()}
+                report["tasks"] = [final_runs.get(row["id"], row) for row in report["tasks"]]
+                report["checks"]["traffic_recorded"] = all(
+                    run.get("network_usage") is not None for run in report["tasks"]
+                )
+                report["traffic"] = client.get("/api/discovery/runtime").json()[
+                    "collection_traffic"
+                ]
+            if args.batch == 3 and not args.publishers:
                 groups = next(
                     source["groups"]
                     for source in report["coverage"]["sources"]
@@ -224,7 +290,9 @@ def main():
                         ]
     finally:
         target = Path(
-            ".runtime/batch-3-verification.json"
+            ".runtime/publishers-batch1-verification.json"
+            if args.publishers
+            else ".runtime/batch-3-verification.json"
             if args.batch == 3
             else ".runtime/batches-1-2-verification.json"
         )

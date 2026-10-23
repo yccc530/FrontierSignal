@@ -40,6 +40,7 @@ def scan_rows(source, groups):
             "last_success_at": None,
             "candidates": None,
             "error": None,
+            "priority": group.get("priority", False),
             **scans.get(group["id"], {}),
         }
         for group in groups

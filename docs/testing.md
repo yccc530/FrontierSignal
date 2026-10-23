@@ -133,6 +133,17 @@ npm --prefix frontend run test:e2e -- discovery.spec.ts visual.spec.ts --grep "p
 
 `verify_expansion.py --analyze-one` 会额外分析一条真实内容并产生模型用量。长轮次模型扫描还有 `verify_model_sources.py`，不是每次提交都必须执行的检查；其参数可用 `--help` 查看。
 
+GLM / Meta 第一批的有界验证（同样适用于 WSL 与 PowerShell，服务须已启动）：
+
+```text
+uv run python scripts/verify_model_sources.py --publishers zai meta --rounds 2
+```
+
+只触发两轮 HF 任务，检查三个账号新扫描、真实模型/筛选、旧记录与阅读状态保留、重复计数和任务流量，
+报告保存在忽略的 `.runtime/publishers-batch1-verification.json`。此模式不主动调用 LLM；已开启的自动调度仍按原设置工作。
+单元测试 `test_publishers.py` 覆盖身份冒用、模态未知、范围限制与固定预算轮换；`test_network.py` 用本地压缩响应验证
+重定向/重试、304、并发计量隔离和跨 UTC 日统计，不访问外网或下载模型。
+
 失败、部分成功、样本不足和未扫描需要如实记录。历史脚本中的轮次数只适用于当时目录和预算，不能保证当前所有主题都被覆盖。
 
 ## API 调试

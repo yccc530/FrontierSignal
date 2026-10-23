@@ -1,6 +1,87 @@
 import { expect, test } from "@playwright/test";
 const headers = { "X-FrontierSignal": "1" };
 
+test("GLM and Meta filters show real records and collection transfer is visible", async ({
+  page,
+  request,
+}) => {
+  for (const [publisher, label] of [
+    ["zai", "智谱 / Z.ai"],
+    ["meta", "Meta"],
+  ]) {
+    const response = await request.get(
+      `/api/articles?content_type=models&publisher=${publisher}&technical=true`,
+    );
+    const data = await response.json();
+    expect(data.total).toBeGreaterThan(0);
+    await page.goto(`/#/feed?content_type=models&publisher=${publisher}`);
+    await expect(page.getByLabel("模型发布团队")).toHaveValue(publisher);
+    await expect(page.getByTestId("article-row")).toHaveCount(
+      Math.min(data.total, 20),
+    );
+    for (const facts of await page.getByTestId("model-facts").all())
+      await expect(facts.locator(".model-tags strong")).toHaveText(label);
+  }
+  await page.screenshot({
+    path: "../.runtime/publishers-batch1-models.png",
+    animations: "disabled",
+  });
+  await page.goto("/#/sources");
+  const panel = page.locator(".coverage-panel");
+  await panel.locator(":scope > summary").click();
+  await expect(panel.getByText("智谱 / Z.ai", { exact: true })).toBeVisible();
+  await expect(
+    panel.getByText("Meta · facebook", { exact: true }),
+  ).toBeVisible();
+  await panel.getByText("每日采集接收量（UTC）").click();
+  const table = panel.getByRole("table", { name: "每日采集流量记录" });
+  await expect(table.locator("tbody tr")).toHaveCount(7);
+  await expect(table.getByText(/MiB/).first()).toBeVisible();
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const containerBox = await panel.boundingBox();
+    const tableBox = await table.boundingBox();
+    expect(tableBox!.width).toBeGreaterThan(containerBox!.width * 0.9);
+    expect(tableBox!.x + tableBox!.width).toBeLessThanOrEqual(width);
+    const contrast = await panel
+      .locator(".coverage-traffic > p")
+      .evaluate((note) => {
+        const foreground = getComputedStyle(note)
+          .color.match(/[\d.]+/g)!
+          .slice(0, 3)
+          .map(Number);
+        const canvas = getComputedStyle(document.documentElement)
+          .getPropertyValue("--canvas")
+          .trim();
+        const background = canvas
+          .slice(1)
+          .match(/.{2}/g)!
+          .map((part) => parseInt(part, 16));
+        const luminance = (rgb: number[]) =>
+          rgb
+            .map((value) => {
+              const normalized = value / 255;
+              return normalized <= 0.04045
+                ? normalized / 12.92
+                : ((normalized + 0.055) / 1.055) ** 2.4;
+            })
+            .reduce(
+              (sum, value, index) =>
+                sum + value * [0.2126, 0.7152, 0.0722][index],
+              0,
+            );
+        const a = luminance(foreground),
+          b = luminance(background);
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      });
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
+    await page.screenshot({
+      path: `../.runtime/publishers-batch1-traffic-${width}.png`,
+      animations: "disabled",
+    });
+  }
+});
+
 test("recommendation shares persist and coverage reports actual observation", async ({
   page,
   request,
@@ -29,11 +110,13 @@ test("recommendation shares persist and coverage reports actual observation", as
     ).toHaveValue("2");
     await page.goto("/#/sources");
     const panel = page.locator(".coverage-panel");
-    await panel.locator("summary").click();
+    await panel.locator(":scope > summary").click();
     await expect(
       panel.getByRole("cell", { name: "3D 资产生成", exact: true }),
     ).toBeVisible();
-    await expect(panel.locator("tbody tr")).toHaveCount(30);
+    await expect(
+      panel.getByRole("table", { name: "技术方向覆盖" }).locator("tbody tr"),
+    ).toHaveCount(30);
     await page.screenshot({
       path: "../.runtime/desktop-expansion-coverage.png",
       animations: "disabled",

@@ -85,3 +85,4 @@ class TaskOut(BaseModel):
     filtered: int
     failed: int
     error: str | None
+    network_usage: dict | None = None

@@ -143,6 +143,7 @@ class TaskRun(Base):
     filtered: Mapped[int] = mapped_column(Integer, default=0)
     failed: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text)
+    network_usage: Mapped[dict | None] = mapped_column(JSON)
 
 
 class Category(Base):

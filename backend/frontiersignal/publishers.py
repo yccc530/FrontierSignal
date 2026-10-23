@@ -122,8 +122,57 @@ PUBLISHERS = {
         "verified_at": "2026-10-23",
         "discovery_topics": ["robotics"],
     },
+    "zai": {
+        "label": "智谱 / Z.ai",
+        "author": "zai-org",
+        "website": "https://z.ai",
+        "verification": "官方 GLM 仓库 README 链接至该 Hub 组织；不代表 Hub 认证徽标",
+        "evidence_url": "https://github.com/zai-org/GLM-4.5",
+        "verified_at": "2026-10-23",
+        "priority": True,
+        "discovery_topics": [
+            "llm",
+            "coding_models",
+            "multimodal",
+            "ocr",
+            "image",
+            "video",
+            "audio",
+        ],
+    },
+    "meta": {
+        "label": "Meta",
+        "author": "meta-llama",
+        "additional_authors": ["facebook"],
+        "website": "https://ai.meta.com",
+        "verification": "两个账号均为 Hub 已认证组织",
+        "evidence_url": "https://huggingface.co/api/organizations/meta-llama/overview",
+        "author_evidence": {
+            "facebook": "https://huggingface.co/api/organizations/facebook/overview",
+        },
+        "verified_at": "2026-10-23",
+        "priority": True,
+        "discovery_topics": [
+            "llm",
+            "coding_models",
+            "multimodal",
+            "image",
+            "video",
+            "audio",
+            "world_models",
+            "robotics",
+        ],
+    },
 }
 VERIFIED_AT = "2026-10-22"
+
+
+def publisher_authors(publisher):
+    return (
+        [publisher["author"], *publisher.get("additional_authors", [])]
+        if publisher["author"]
+        else []
+    )
 
 
 def publisher_for_author(author):
@@ -131,9 +180,20 @@ def publisher_for_author(author):
         (
             (key, value)
             for key, value in PUBLISHERS.items()
-            if value["author"] and value["author"].casefold() == str(author).casefold()
+            if str(author).casefold() in {name.casefold() for name in publisher_authors(value)}
         ),
         (None, None),
+    )
+
+
+def publisher_evidence(publisher, author):
+    return next(
+        (
+            url
+            for name, url in publisher.get("author_evidence", {}).items()
+            if name.casefold() == str(author).casefold()
+        ),
+        publisher["evidence_url"],
     )
 
 

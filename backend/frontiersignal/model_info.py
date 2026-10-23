@@ -6,20 +6,29 @@ from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
 from .normalizer import canonical_url
-from .publishers import PUBLISHERS, publisher_for_author
+from .publishers import PUBLISHERS, publisher_evidence, publisher_for_author
 from .topics import CATALOG, PATTERNS, collection_topics
 
 HUB_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*")
 MODEL_FAMILY = re.compile(
-    r"\b(?:gpt|gemini|gemma|claude|qwen|deepseek|mistral|phi|llama)[ -]?(?:v)?\d", re.I
+    r"\b(?:gpt|gemini|gemma|claude|qwen|deepseek|mistral|phi|llama|chatglm|glm)[ -]?(?:v)?\d", re.I
 )
 CREATIVE_FAMILIES = {
     "3d": re.compile(r"\b(?:hunyuan3d|trellis)(?:[. _-]|$)", re.I),
-    "image": re.compile(r"\b(?:flux[. -]?\d|stable diffusion|imagen|qwen.image)\b", re.I),
-    "video": re.compile(r"\b(?:sora|veo|wan[. -]?\d|hunyuanvideo|ltx[. -]?(?:video|\d))\b", re.I),
-    "audio": re.compile(
-        r"\b(?:whisper|stable audio|cosyvoice|ace.step|musicgen|qwen[\d.]*.tts)\b", re.I
+    "image": re.compile(
+        r"\b(?:flux[. -]?\d|stable diffusion|imagen|qwen.image|cogview[\d.]*|glm.image)\b", re.I
     ),
+    "video": re.compile(
+        r"\b(?:sora|veo|wan[. -]?\d|hunyuanvideo|ltx[. -]?(?:video|\d)|cogvideox?[\d.-]*)\b", re.I
+    ),
+    "audio": re.compile(
+        r"\b(?:whisper|stable audio|cosyvoice|ace.step|musicgen|qwen[\d.]*.tts|glm[\d.-]*.(?:voice|tts)|audiocraft|audiobox)\b",
+        re.I,
+    ),
+    "multimodal": re.compile(
+        r"\b(?:sam[ -]?\d|segment.anything|dinov\d|glm[\d.-]*v)(?:\b|[_-])", re.I
+    ),
+    "world_models": re.compile(r"\b(?:v[.-]?jepa[ -]?\d?|jepa.world)\b", re.I),
 }
 # Modalities describe the declared Hub task, not independently tested model capabilities.
 MODEL_TASKS = {
@@ -69,6 +78,15 @@ def model_topics(payload: dict) -> list[str]:
     identifier = str(payload.get("id", ""))
     _, publisher = publisher_for_author(identifier.split("/")[0])
     if publisher:
+        if (
+            "llm" not in result
+            and "llm" in publisher.get("discovery_topics", collection_topics("hf_models"))
+            and MODEL_FAMILY.search(identifier)
+            and not pipeline
+            and not any(pattern.search(identifier) for pattern in CREATIVE_FAMILIES.values())
+            and not PATTERNS["ocr"].search(identifier)
+        ):
+            result.append("llm")
         for key, pattern in CREATIVE_FAMILIES.items():
             if (
                 key not in result
@@ -119,7 +137,7 @@ def model_metadata(payload: dict) -> dict:
         "publisher_id": publisher_id,
         "publisher": publisher["label"] if publisher else author,
         "publisher_verified": publisher is not None,
-        "publisher_evidence": publisher["evidence_url"] if publisher else None,
+        "publisher_evidence": publisher_evidence(publisher, author) if publisher else None,
         "task": task,
         "task_label": task_info[0] if task_info else None,
         "modalities": {"inputs": list(task_info[1]), "outputs": list(task_info[2]), "basis": task}

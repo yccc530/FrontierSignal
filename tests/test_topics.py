@@ -26,11 +26,11 @@ async def test_historical_reclassification_preview_and_apply_preserve_reading_an
         session.add(source)
         await session.flush()
         item = RawItem(
-            platform_id="fixture/coder",
-            title="fixture/coder",
+            platform_id="zai-org/GLM-4.5",
+            title="zai-org/GLM-4.5",
             body="Code generation training implementation with benchmark",
             raw={
-                "id": "fixture/coder",
+                "id": "zai-org/GLM-4.5",
                 "pipeline_tag": "text-generation",
                 "tags": ["code-generation"],
                 "createdAt": "2025-01-01T00:00:00Z",
@@ -51,11 +51,13 @@ async def test_historical_reclassification_preview_and_apply_preserve_reading_an
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "settings", settings)
-    await module.main()
+    await module.main(apply=True, publisher="nvidia")
+    assert "'processed': 0" in capsys.readouterr().out
+    await module.main(publisher="zai")
     async with db.sessions() as session:
         preview = await session.get(Article, identifier)
         assert preview.technical_topics == [] and "model" not in preview.metrics
-    await module.main(apply=True)
+    await module.main(apply=True, publisher="zai")
     async with db.sessions() as session:
         updated = await session.get(Article, identifier)
         assert "coding_models" in updated.technical_topics
@@ -63,9 +65,10 @@ async def test_historical_reclassification_preview_and_apply_preserve_reading_an
         assert updated.is_read and updated.is_favorite
         assert updated.status == "analyzed" and updated.analysis_hash == "keep-analysis"
         assert updated.summary_zh == "已保存的中文摘要"
+        assert updated.metrics["model"]["publisher_id"] == "zai"
         assert await session.scalar(select(func.count()).select_from(RawRecord)) == 1
     capsys.readouterr()
-    await module.main()
+    await module.main(publisher="zai")
     assert "'changed': 0" in capsys.readouterr().out
 
 

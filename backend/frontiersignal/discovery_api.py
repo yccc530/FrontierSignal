@@ -55,14 +55,23 @@ async def discovery_coverage(request: Request):
                 else research_groups(source)
             )
             config = request.app.state.settings
+            priority_rounds = None
             if source.kind == "hf_models":
                 remaining = {group["id"] for group in groups}
+                priority = {group["id"] for group in groups if group.get("priority")}
                 start = (source.cursor or {}).get("model_tick", 0)
                 requests = 0
                 while remaining and requests < 10000:
                     group, _ = model_query(source, start + requests, 1)
                     remaining.discard(group["id"])
                     requests += 1
+                    priority.discard(group["id"])
+                    if (
+                        not priority
+                        and priority_rounds is None
+                        and any(group.get("priority") for group in groups)
+                    ):
+                        priority_rounds = math.ceil(requests / config.hf_queries_per_run)
                 rounds = math.ceil(requests / config.hf_queries_per_run)
                 request_budget = config.hf_queries_per_run + config.hf_card_checks
             else:
@@ -93,6 +102,9 @@ async def discovery_coverage(request: Request):
                     "automatic": source.automatic,
                     "scan_cycle_hours": round(rounds * source.interval_minutes / 60, 1),
                     "request_budget": request_budget,
+                    "priority_scan_hours": round(priority_rounds * source.interval_minutes / 60, 1)
+                    if priority_rounds is not None
+                    else None,
                     "groups": scan_rows(source, groups),
                 }
             )

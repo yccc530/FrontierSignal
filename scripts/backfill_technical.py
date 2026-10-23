@@ -10,22 +10,34 @@ from frontiersignal.db import Database
 from frontiersignal.model_info import annotate_official_model, attach_model_card, model_metadata
 from frontiersignal.models import Article, RawRecord, Repository
 from frontiersignal.normalizer import RawItem
+from frontiersignal.publishers import PUBLISHERS, publisher_authors
 from frontiersignal.similarity import rebuild_explicit_links
 from frontiersignal.technical import technical_signal
-from sqlalchemy import select
+from sqlalchemy import false, func, or_, select
 
 
-async def main(apply=False, limit=500, after_id="", link_references=False):
+async def main(apply=False, limit=500, after_id="", link_references=False, publisher=None):
     db = Database(settings)
     count = eligible = changed = 0
     last_id = None
     try:
         async with db.sessions(autoflush=False) as session:
-            rows = (
-                await session.scalars(
-                    select(Article).where(Article.id > after_id).order_by(Article.id).limit(limit)
+            query = select(Article).where(Article.id > after_id)
+            if publisher:
+                authors = publisher_authors(PUBLISHERS[publisher])
+                query = query.where(
+                    Article.source.has(kind="hf_models"),
+                    or_(
+                        false(),
+                        *(
+                            func.lower(Article.platform_id).startswith(
+                                f"{author.casefold()}/", autoescape=True
+                            )
+                            for author in authors
+                        ),
+                    ),
                 )
-            ).all()
+            rows = (await session.scalars(query.order_by(Article.id).limit(limit))).all()
             for article in rows:
                 before = (
                     article.technical_topics,
@@ -170,6 +182,7 @@ async def main(apply=False, limit=500, after_id="", link_references=False):
                 "changed": changed,
                 "technical_eligible": eligible,
                 "llm_requests": 0,
+                "publisher": publisher,
                 "explicit_links": links,
                 "next_after_id": last_id if count == limit else None,
             }
@@ -186,6 +199,11 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=500)
     parser.add_argument("--after-id", default="")
     parser.add_argument(
+        "--publisher",
+        choices=list(PUBLISHERS),
+        help="Only saved Hub originals owned by this publisher",
+    )
+    parser.add_argument(
         "--link-references",
         action="store_true",
         help="Also rebuild bounded explicit model/paper/code/dataset references",
@@ -193,4 +211,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not 1 <= args.limit <= 5000:
         parser.error("--limit must be 1..5000")
-    asyncio.run(main(args.apply, args.limit, args.after_id, args.link_references))
+    asyncio.run(main(args.apply, args.limit, args.after_id, args.link_references, args.publisher))

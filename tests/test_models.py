@@ -62,10 +62,10 @@ def test_model_query_rotation_covers_topics_publishers_and_freshness_with_bounde
         kind="hf_models", config={"discovery_topics": ["llm", "multimodal", "coding_models", "ocr"]}
     )
     groups = model_groups(source)
-    queries = [model_query(source, tick, 5) for tick in range(108)]
+    queries = [model_query(source, tick, 5) for tick in range(216)]
     assert {group["id"] for group, _ in queries} == {group["id"] for group in groups}
     assert sum(group["lane"] == "global" for group, _ in queries) == 18
-    assert sum(group["lane"] == "topic" for group, _ in queries) == 72
+    assert sum(group["lane"] == "topic" for group, _ in queries) == 90
     assert {params["sort"] for group, params in queries if group["lane"] == "topic"} == {
         "createdAt",
         "lastModified",
@@ -190,7 +190,7 @@ async def test_query_failure_advances_and_does_not_discard_other_groups():
     assert result.errors and result.items and result.advance_on_partial
     assert result.cursor["model_tick"] == 3
     assert result.cursor["scans"]["topic:llm:text-generation"]["status"] == "failed"
-    assert result.cursor["scans"]["publisher:openai"]["status"] == "success"
+    assert result.cursor["scans"]["publisher:zai"]["status"] == "success"
     assert "private service body" not in str(result.errors)
 
 

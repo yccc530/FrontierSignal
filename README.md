@@ -67,10 +67,13 @@
 | GitHub       | AI 项目发现、Stars 变化、版本发布；保留 vLLM、LangChain 的固定版本跟踪 |
 | Hacker News  | AI 技术帖子、points、评论总数及有限评论样本                            |
 | arXiv        | `cs.AI`、`cs.LG`、`cs.CL`、`cs.CV`，以及工程和科学研究专项查询         |
-| Hugging Face | 模型、数据集、模型卡和官方博客                                         |
+| Hugging Face | 模型、数据集、模型卡和官方博客；优先跟踪 GLM 与 Meta 官方模型账号     |
 | 官方技术博客 | OpenAI、Google DeepMind、Google AI、NVIDIA                             |
 
 主题包括 LLM、Agent、训练与推理、RAG、多模态、代码模型、OCR、创作模型、3D/CAD、世界模型、具身智能、Vibe 开发、MCP/Skills、开发工具链，以及 AI 科学研究。
+
+在「资讯库」选择内容类型「模型资讯」，再按发布团队筛选「智谱 / Z.ai」或「Meta」。
+新增团队共用原有采集预算，不下载模型权重；「信息来源 → 采集覆盖与持续观察」可查看重点账号扫描和每日采集响应正文接收量。该计量不含 LLM 与网络协议开销，不能代替代理账单。
 
 GitHub 热榜来自官方 API 和实际观测数据，不等同于 GitHub Trending。缺少历史快照时，增长显示为待积累；不会用累计 Stars 高的老项目填满增长榜。X、Reddit 当前不接入，Anthropic 尚未配置稳定的官方订阅入口。具体频率和限制见 [信息来源](docs/data-sources.md)。
 

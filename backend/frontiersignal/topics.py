@@ -22,7 +22,7 @@ CATALOG = {
     "llm": Topic(
         "大模型",
         "基础模型",
-        r"\b(?:llms?|large language models?|language models?|gpt[- ]?\d|claude|gemini|llama|qwen|deepseek|mistral|text-generation)\b|大模型|语言模型",
+        r"\b(?:llms?|large language models?|language models?|gpt[- ]?\d|claude|gemini|llama|qwen|deepseek|mistral|text-generation|chatglm[ -]?\d*|glm[ -]?\d[\d.]*)(?:\b|_)|大模型|语言模型|智谱|智譜",
         github_query="topic:llm",
         hf_tasks=("text-generation", "text2text-generation"),
     ),
@@ -58,7 +58,7 @@ CATALOG = {
     "multimodal": Topic(
         "多模态",
         "基础模型",
-        r"\b(?:multimodal|multi.modal|vision.language|diffusion|computer.vision|image.generation|vlm|text.to.image|image.text.to.text)\b|多模态|视觉模型",
+        r"\b(?:multimodal|multi.modal|vision.language|diffusion|computer.vision|image.generation|vlm|text.to.image|image.text.to.text|segment.anything|dinov\d+|sam[ -]?\d+|glm[\d.-]*v)\b|多模态|视觉模型",
         github_query="topic:multimodal",
         hf_tasks=("image-text-to-text", "visual-question-answering"),
     ),

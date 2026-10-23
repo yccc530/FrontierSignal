@@ -83,10 +83,17 @@ async def test_task_isolation_concurrent_submission_and_duplicates(database, mon
         assert (await session.get(TaskRun, first.id)).added == 1
         assert (await session.get(TaskRun, broken.id)).status == "failed"
         assert (await session.get(TaskRun, again.id)).duplicates == 1
+        assert (await session.get(TaskRun, broken.id)).network_usage[
+            "basis"
+        ] == "http_response_body"
     await manager.stop()
 
 
 async def test_collection_deadline_records_useful_error(database, monkeypatch):
+    from types import SimpleNamespace
+
+    from frontiersignal.network import transfer_meter
+
     db, settings = database
     settings = settings.model_copy(update={"task_timeout": 0.02})
 
@@ -95,6 +102,9 @@ async def test_collection_deadline_records_useful_error(database, monkeypatch):
             pass
 
         async def collect(self, source):
+            meter = transfer_meter.get()
+            day = meter.begin_request()
+            meter.received(day, SimpleNamespace(total_raw_bytes=123, total_bytes=456))
             await asyncio.Event().wait()
 
     monkeypatch.setitem(COLLECTORS, "slow", SlowCollector)
@@ -108,6 +118,8 @@ async def test_collection_deadline_records_useful_error(database, monkeypatch):
     async with db.sessions() as session:
         recorded = await session.get(TaskRun, run.id)
         assert recorded.status == "failed" and "timeout" in recorded.error
+        assert recorded.network_usage is not None
+        assert next(iter(recorded.network_usage["days"].values()))["received_bytes"] == 123
     await manager.stop()
 
 

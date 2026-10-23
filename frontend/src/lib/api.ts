@@ -217,6 +217,7 @@ export type DiscoveryCoverage = {
     automatic: boolean;
     scan_cycle_hours: number;
     request_budget: number;
+    priority_scan_hours?: number | null;
     groups: {
       id: string;
       label: string;
@@ -226,6 +227,7 @@ export type DiscoveryCoverage = {
       last_success_at: string | null;
       candidates: number | null;
       error: string | null;
+      priority?: boolean;
       added?: number;
       updated?: number;
       duplicates?: number;
@@ -322,6 +324,20 @@ export type RuntimeReport = {
     attempts: number;
     input_tokens: number | null;
     output_tokens: number | null;
+  };
+  collection_traffic?: {
+    basis: "http_response_body";
+    timezone: "UTC";
+    days: {
+      date: string;
+      requests: number;
+      received_bytes: number;
+      decoded_bytes: number;
+      measured_tasks: number;
+      unmeasured_tasks: number;
+      running_tasks: number;
+      unmeasured_responses: number;
+    }[];
   };
 };
 export type Dashboard = {

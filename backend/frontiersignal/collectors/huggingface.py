@@ -8,7 +8,7 @@ from ..models import Source, now
 from ..network import FetchError
 from ..normalizer import RawItem
 from ..projects import parse_time
-from ..publishers import PUBLISHERS
+from ..publishers import PUBLISHERS, publisher_authors
 from ..topics import CATALOG, selected_topics
 from .base import Collection
 
@@ -49,14 +49,17 @@ def model_groups(source):
             )
     for key, publisher in PUBLISHERS.items():
         supported = [key for key in topics if key in publisher.get("discovery_topics", topics)]
-        if publisher["author"] and supported:
+        for author in publisher_authors(publisher) if supported else []:
             groups.append(
                 {
-                    "id": f"publisher:{key}",
-                    "label": publisher["label"],
+                    "id": f"publisher:{key}"
+                    + (f":{author}" if author != publisher["author"] else ""),
+                    "label": publisher["label"]
+                    + (f" · {author}" if publisher.get("additional_authors") else ""),
                     "topics": supported,
-                    "params": {"author": publisher["author"]},
-                    "lane": "publisher",
+                    "params": {"author": author},
+                    "lane": "priority" if publisher.get("priority") else "publisher",
+                    "priority": publisher.get("priority", False),
                 }
             )
     return groups
@@ -64,7 +67,23 @@ def model_groups(source):
 
 def model_query(source, tick, limit):
     groups = model_groups(source)
-    lanes = ("global", "topic", "publisher", "topic", "topic", "topic")
+    # Reserve existing request slots for the followed teams, without increasing the budget.
+    lanes = (
+        "global",
+        "priority",
+        "topic",
+        "publisher",
+        "topic",
+        "priority",
+        "topic",
+        "priority",
+        "topic",
+        "publisher",
+        "topic",
+        "priority",
+    )
+    if not any(group["lane"] == "priority" for group in groups):
+        lanes = tuple("topic" if lane == "priority" else lane for lane in lanes)
     lane = lanes[tick % len(lanes)]
     choices = [group for group in groups if group["lane"] == lane]
     if not choices:
@@ -81,6 +100,8 @@ def model_query(source, tick, limit):
     params = {
         "sort": "trendingScore"
         if lane == "global"
+        else ("createdAt", "lastModified")[rotation % 2]
+        if lane == "priority"
         else ("createdAt", "lastModified", "trendingScore")[rotation % 3],
         "direction": -1,
         "limit": limit,
@@ -146,7 +167,9 @@ class HuggingFaceCollector:
                         continue
                     observations[row["id"]] = row
                     memberships.setdefault(row["id"], set()).add(group["id"])
-                    priority = {"publisher": 0, "topic": 1, "global": 2}[group["lane"]]
+                    priority = {"priority": 0, "publisher": 1, "topic": 2, "global": 3}[
+                        group["lane"]
+                    ]
                     priorities[row["id"]] = min(priority, priorities.get(row["id"], priority))
                 error = f"{rejected} 条模型记录格式无效" if rejected else None
                 record_scan(

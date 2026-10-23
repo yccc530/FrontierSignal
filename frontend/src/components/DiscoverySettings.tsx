@@ -90,11 +90,18 @@ export default function DiscoverySettings({ source }: { source: Source }) {
           <li>
             每轮请求预算 {sourceCoverage.request_budget} · 全部子查询轮换约{" "}
             {sourceCoverage.scan_cycle_hours} 小时（不含失败重试）
+            {sourceCoverage.priority_scan_hours != null && (
+              <span>
+                {" "}
+                · 下一轮重点厂商覆盖约 {sourceCoverage.priority_scan_hours} 小时
+              </span>
+            )}
           </li>
         )}
         {scans.map((scan) => (
           <li key={scan.id}>
             <strong>{scan.label}</strong>
+            {scan.priority && <span className="tag">优先跟踪</span>}
             <Status value={scan.status === "pending" ? "never" : scan.status} />
             <span>
               {scan.last_scan_at ? dateTime(scan.last_scan_at) : "尚未扫描"}

@@ -1,6 +1,6 @@
 """Durable sampling distinguishes actual observation time from configured uptime."""
 
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from sqlalchemy import func, select
 
@@ -97,4 +97,52 @@ async def runtime_report(session, settings, at):
             for status, count, added, failed in runs
         ],
         "llm_24h": {"attempts": tokens[0], "input_tokens": tokens[1], "output_tokens": tokens[2]},
+        "collection_traffic": await collection_traffic(session, at),
+    }
+
+
+async def collection_traffic(session, at):
+    """UTC daily body bytes from completed task observations, including failed requests."""
+    at = at.astimezone(UTC)
+    rows = (
+        await session.execute(
+            select(TaskRun.created_at, TaskRun.status, TaskRun.network_usage).where(
+                TaskRun.kind == "collect", TaskRun.created_at >= at - timedelta(days=8)
+            )
+        )
+    ).all()
+    days = {
+        (at - timedelta(days=offset)).date().isoformat(): {
+            "requests": 0,
+            "received_bytes": 0,
+            "decoded_bytes": 0,
+            "measured_tasks": 0,
+            "unmeasured_tasks": 0,
+            "running_tasks": 0,
+            "unmeasured_responses": 0,
+        }
+        for offset in range(7)
+    }
+    for created_at, status, usage in rows:
+        day = created_at.astimezone(UTC).date().isoformat()
+        if status in {"queued", "running"}:
+            if day in days:
+                days[day]["running_tasks"] += 1
+            continue
+        if usage is None:
+            if day in days:
+                days[day]["unmeasured_tasks"] += 1
+            continue
+        entries = usage.get("days", {}) or {day: {}}
+        for date, counters in entries.items():
+            if date not in days:
+                continue
+            row = days[date]
+            row["measured_tasks"] += 1
+            for key in ("requests", "received_bytes", "decoded_bytes", "unmeasured_responses"):
+                row[key] += counters.get(key, 0)
+    return {
+        "basis": "http_response_body",
+        "timezone": "UTC",
+        "days": [{"date": day, **counters} for day, counters in days.items()],
     }
