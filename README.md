@@ -4,7 +4,44 @@
 
 持续发现短期 Stars 增长显著的开源项目，跟踪模型发布、前沿论文与开发工具，在本地工作台中完成中文阅读、检索、收藏和来源追踪。
 
-[快速开始](#快速开始) · [使用指南](docs/usage.md) · [模型与配置](docs/configuration.md) · [信息来源](docs/data-sources.md) · [常见问题](docs/troubleshooting.md)
+[界面预览](#界面预览) · [快速开始](#快速开始) · [使用指南](docs/usage.md) · [模型与配置](docs/configuration.md) · [信息来源](docs/data-sources.md) · [常见问题](docs/troubleshooting.md)
+
+## 界面预览
+
+以下为 2026-10-23 从实际运行的工作台截取的桌面界面，分辨率为 1440 × 1000。内容与指标来自当时的本地采集数据，新安装不会附带这些资讯。点击图片可查看原尺寸。
+
+**技术推荐**：集中浏览短期增长异动，查看中文简介、近期获星与推荐理由。
+
+[![技术推荐首页：研究偏好、推荐份额与短期增长项目](docs/images/workbench.png)](docs/images/workbench.png)
+
+<details>
+<summary>展开查看开源项目、模型资讯、详情阅读与来源管理</summary>
+
+### 开源项目
+
+切换增长异动、新项目与全部项目，按技术方向检索，区分近期获星和累计 Stars。
+
+[![开源项目：真实 Stars 增长、增长速度及项目筛选](docs/images/projects.png)](docs/images/projects.png)
+
+### 模型资讯
+
+按内容类型、技术主题和发布团队筛选。下图展示视频模型的中文解读、任务类型与原始资源链接。
+
+[![模型资讯库：视频生成与编辑方向的模型筛选和中文摘要](docs/images/models.png)](docs/images/models.png)
+
+### 详情阅读
+
+查看中文摘要、输入输出模态、许可证声明和来源时间。缺少的发布日期、未完整获取的模型卡会明确标注。
+
+[![模型详情：中文解读、模型元数据、许可证及信息完整性提示](docs/images/model-detail.png)](docs/images/model-detail.png)
+
+### 来源管理
+
+管理来源启停、自动采集与间隔，查看最近成功时间、扫描记录和持续观察状态。
+
+[![信息来源：采集状态、采集频率、来源开关与覆盖监控入口](docs/images/sources.png)](docs/images/sources.png)
+
+</details>
 
 ## 你可以用它做什么
 
