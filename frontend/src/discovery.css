@@ -753,25 +753,3 @@
   max-height: 480px;
   overflow: auto;
 }
-.coverage-traffic {
-  margin-block: var(--space-3) var(--space-5);
-  width: 100%;
-  min-width: 0;
-}
-.coverage-traffic > summary {
-  cursor: pointer;
-  padding-block: var(--space-3);
-  color: var(--text);
-  font-weight: 600;
-}
-.coverage-traffic > p {
-  color: var(--muted);
-  font-size: var(--text-label);
-  line-height: 1.65;
-  margin-block: var(--space-2) var(--space-3);
-  text-wrap: pretty;
-}
-.coverage-traffic td:nth-child(-n + 3) {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}

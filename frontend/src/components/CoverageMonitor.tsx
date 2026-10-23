@@ -20,7 +20,6 @@ export default function CoverageMonitor() {
     refetchInterval: 30000,
   });
   const report = runtime.data;
-  const traffic = report?.collection_traffic;
   const publishers =
     coverage.data?.sources
       .filter((source) => source.enabled && source.automatic)
@@ -76,49 +75,6 @@ export default function CoverageMonitor() {
             </p>
           ))}
         </div>
-      )}
-      {traffic && (
-        <details className="coverage-traffic" aria-label="每日采集接收量">
-          <summary>每日采集接收量（UTC）</summary>
-          <p>
-            任务结束后记录响应正文接收量，含重试与跳转；不含请求上传、协议开销、LLM
-            调用和手动打开原文的流量。
-          </p>
-          <div className="table-scroll">
-            <table className="data-table" aria-label="每日采集流量记录">
-              <thead>
-                <tr>
-                  <th>日期</th>
-                  <th>请求次数</th>
-                  <th>已测接收量</th>
-                  <th>记录完整性</th>
-                </tr>
-              </thead>
-              <tbody>
-                {traffic.days.map((day) => (
-                  <tr key={day.date}>
-                    <td>{day.date}</td>
-                    <td>{day.measured_tasks ? day.requests : "未记录"}</td>
-                    <td>
-                      {day.measured_tasks
-                        ? `${(day.received_bytes / 1024 / 1024).toFixed(2)} MiB`
-                        : "未记录"}
-                    </td>
-                    <td>
-                      {day.measured_tasks} 个已记录任务
-                      {day.unmeasured_tasks > 0 &&
-                        ` · ${day.unmeasured_tasks} 个任务无记录`}
-                      {day.running_tasks > 0 &&
-                        ` · ${day.running_tasks} 个任务待结束`}
-                      {day.unmeasured_responses > 0 &&
-                        ` · ${day.unmeasured_responses} 次响应无法计量`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
       )}
       <div className="table-scroll">
         <table className="data-table" aria-label="技术方向覆盖">

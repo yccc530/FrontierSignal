@@ -219,14 +219,6 @@ def main():
                     >= datetime.fromisoformat(report["at"])
                     for row in selected
                 )
-                final_runs = {row["id"]: row for row in client.get("/api/tasks").json()}
-                report["tasks"] = [final_runs.get(row["id"], row) for row in report["tasks"]]
-                report["checks"]["traffic_recorded"] = all(
-                    run.get("network_usage") is not None for run in report["tasks"]
-                )
-                report["traffic"] = client.get("/api/discovery/runtime").json()[
-                    "collection_traffic"
-                ]
             if args.batch == 3 and not args.publishers:
                 groups = next(
                     source["groups"]

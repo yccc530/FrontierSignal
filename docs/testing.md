@@ -139,10 +139,11 @@ GLM / Meta 第一批的有界验证（同样适用于 WSL 与 PowerShell，服�
 uv run python scripts/verify_model_sources.py --publishers zai meta --rounds 2
 ```
 
-只触发两轮 HF 任务，检查三个账号新扫描、真实模型/筛选、旧记录与阅读状态保留、重复计数和任务流量，
+只触发两轮 HF 任务，检查三个账号新扫描、真实模型/筛选、旧记录与阅读状态保留、重复计数，
 报告保存在忽略的 `.runtime/publishers-batch1-verification.json`。此模式不主动调用 LLM；已开启的自动调度仍按原设置工作。
-单元测试 `test_publishers.py` 覆盖身份冒用、模态未知、范围限制与固定预算轮换；`test_network.py` 用本地压缩响应验证
-重定向/重试、304、并发计量隔离和跨 UTC 日统计，不访问外网或下载模型。
+单元测试 `test_publishers.py` 覆盖身份冒用、模态未知、范围限制与固定预算轮换；`test_network.py` 验证 DNS 安全检查、暂时性错误重试和限流处理。
+`test_collection_deadline_records_useful_error` 在采集器开始后主动触发真实超时，验证失败状态、错误原因与结束时间，
+不依赖数据库在极短时间内完成操作，也不访问外部服务。
 
 失败、部分成功、样本不足和未扫描需要如实记录。历史脚本中的轮次数只适用于当时目录和预算，不能保证当前所有主题都被覆盖。
 

@@ -58,7 +58,7 @@ Manage enabled sources, automatic collection, and intervals. Review successful r
 | Read technical intelligence | Generate Chinese titles, summaries, categories, and importance scores with a configurable LLM while retaining originals and evidence links |
 | Build a research library    | Search, filter, bookmark, and track read status across recommendations, projects, and articles                                             |
 | Set research priorities     | Configure collection scope, research interests, recommendation counts, and topic allocation independently                                  |
-| Inspect collection activity | Review task results, errors, source coverage, star history, model calls, and measured collection response-body traffic                     |
+| Inspect collection activity | Review task results, errors, source coverage, star history, and model calls                     |
 
 **An LLM is optional for collection, search, and reading.** Configure one to generate Chinese analysis. Failed model calls leave the original records intact and can be retried individually.
 
@@ -76,7 +76,7 @@ The application includes **16 default source configurations and 30 technical top
 
 Topics include LLMs, agents, training and inference, RAG, multimodal and coding models, OCR, image/video/audio generation, 3D/CAD, world models, robotics, vibe coding, MCP/skills, development tools, and AI for science.
 
-To browse GLM or Meta, open **Articles (资讯库)**, select **Model news (模型资讯)**, and filter the publisher to **智谱 / Z.ai** or **Meta**. These accounts share the existing request budget; collection does not download model weights. Source coverage also reports daily received response-body bytes. This excludes LLM traffic and protocol overhead and is not a proxy billing total.
+To browse GLM or Meta, open **Articles (资讯库)**, select **Model news (模型资讯)**, and filter the publisher to **智谱 / Z.ai** or **Meta**. These accounts share the existing request budget; collection does not download model weights. Source coverage reports the latest successful scan and any collection errors for each priority account.
 
 GitHub rankings are derived from official API data and recorded observations; they are not GitHub Trending rankings. Growth remains unknown until sufficient history exists, and high lifetime star counts do not automatically fill the growth list. X and Reddit are not integrated. Anthropic does not yet have a verified default feed. See [data sources and limitations](docs/data-sources.md) for details.
 

@@ -83,28 +83,30 @@ async def test_task_isolation_concurrent_submission_and_duplicates(database, mon
         assert (await session.get(TaskRun, first.id)).added == 1
         assert (await session.get(TaskRun, broken.id)).status == "failed"
         assert (await session.get(TaskRun, again.id)).duplicates == 1
-        assert (await session.get(TaskRun, broken.id)).network_usage[
-            "basis"
-        ] == "http_response_body"
     await manager.stop()
 
 
 async def test_collection_deadline_records_useful_error(database, monkeypatch):
-    from types import SimpleNamespace
-
-    from frontiersignal.network import transfer_meter
-
     db, settings = database
-    settings = settings.model_copy(update={"task_timeout": 0.02})
+    real_timeout = asyncio.timeout
+    deadline = None
+
+    def controlled_timeout(seconds):
+        nonlocal deadline
+        assert seconds == settings.task_timeout
+        # Exercise real cancellation at a known phase, independent of database speed.
+        deadline = real_timeout(None)
+        return deadline
+
+    monkeypatch.setattr("frontiersignal.tasks.asyncio.timeout", controlled_timeout)
 
     class SlowCollector:
         def __init__(self, fetcher):
             pass
 
         async def collect(self, source):
-            meter = transfer_meter.get()
-            day = meter.begin_request()
-            meter.received(day, SimpleNamespace(total_raw_bytes=123, total_bytes=456))
+            assert deadline is not None
+            deadline.reschedule(asyncio.get_running_loop().time())
             await asyncio.Event().wait()
 
     monkeypatch.setitem(COLLECTORS, "slow", SlowCollector)
@@ -113,14 +115,17 @@ async def test_collection_deadline_records_useful_error(database, monkeypatch):
         await session.commit()
     manager = TaskManager(db, settings)
     await manager.start()
-    run = await manager.submit("slow")
-    await asyncio.gather(*list(manager.workers))
-    async with db.sessions() as session:
-        recorded = await session.get(TaskRun, run.id)
-        assert recorded.status == "failed" and "timeout" in recorded.error
-        assert recorded.network_usage is not None
-        assert next(iter(recorded.network_usage["days"].values()))["received_bytes"] == 123
-    await manager.stop()
+    try:
+        run = await manager.submit("slow")
+        await asyncio.wait_for(asyncio.gather(*list(manager.workers)), timeout=15)
+        assert deadline is not None and deadline.expired()
+        async with db.sessions() as session:
+            recorded = await session.get(TaskRun, run.id)
+            assert recorded.status == "failed" and "timeout" in recorded.error
+            assert recorded.failed == 1 and recorded.finished_at is not None
+            assert (await session.get(Source, "slow")).last_status == "failed"
+    finally:
+        await manager.stop()
 
 
 async def test_background_collection_does_not_hold_api_request(client, monkeypatch):

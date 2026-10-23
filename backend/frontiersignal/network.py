@@ -2,8 +2,6 @@ import asyncio
 import ipaddress
 import json
 import math
-from contextvars import ContextVar
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -11,38 +9,6 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import aiohttp
 
 from .config import Settings
-
-
-@dataclass
-class TransferMeter:
-    """Observed HTTP response bodies; excludes headers, uploads, TLS and proxy overhead."""
-
-    days: dict[str, dict] = field(default_factory=dict)
-
-    def begin_request(self, at=None):
-        day = (at or datetime.now(UTC)).astimezone(UTC).date().isoformat()
-        row = self.days.setdefault(
-            day, {"requests": 0, "received_bytes": 0, "decoded_bytes": 0, "unmeasured_responses": 0}
-        )
-        row["requests"] += 1
-        return day
-
-    def received(self, day, stream):
-        row = self.days[day]
-        raw = getattr(stream, "total_raw_bytes", None)
-        if raw is None:
-            row["unmeasured_responses"] += 1
-        else:
-            row["received_bytes"] += raw
-        row["decoded_bytes"] += stream.total_bytes
-
-    def snapshot(self):
-        return {"basis": "http_response_body", "timezone": "UTC", "days": self.days}
-
-
-transfer_meter: ContextVar[TransferMeter | None] = ContextVar(
-    "collector_transfer_meter", default=None
-)
 
 DEFAULT_HOSTS = {
     "huggingface.co",
@@ -151,39 +117,31 @@ class Fetcher:
                     server_hostname = parsed.hostname
                     request_headers["Host"] = parsed.hostname
                     # CONNECT to the validated IP, with the original TLS hostname.
-                meter = transfer_meter.get()
-                day = meter.begin_request() if meter else None
-                response = None
-                try:
-                    async with client.get(
-                        target_url,
-                        headers=request_headers,
-                        allow_redirects=False,
-                        proxy=proxy,
-                        server_hostname=server_hostname,
-                    ) as r:
-                        response = r
-                        if r.status in {301, 302, 303, 307, 308}:
-                            url = urljoin(url, r.headers.get("Location", ""))
-                            continue
-                        if r.status == 304:
-                            return b"", dict(r.headers), 304
-                        if r.status != 200:
-                            raise FetchError(
-                                f"HTTP {r.status}; source refused or unavailable",
-                                r.status,
-                                retry_after_seconds(r.headers.get("Retry-After")),
-                            )
-                        chunks, size = [], 0
-                        async for chunk in r.content.iter_chunked(65536):
-                            size += len(chunk)
-                            if size > 5_000_000:
-                                raise FetchError("Source response exceeds 5 MB")
-                            chunks.append(chunk)
-                        return b"".join(chunks), dict(r.headers), r.status
-                finally:
-                    if meter and response is not None:
-                        meter.received(day, response.content)
+                async with client.get(
+                    target_url,
+                    headers=request_headers,
+                    allow_redirects=False,
+                    proxy=proxy,
+                    server_hostname=server_hostname,
+                ) as r:
+                    if r.status in {301, 302, 303, 307, 308}:
+                        url = urljoin(url, r.headers.get("Location", ""))
+                        continue
+                    if r.status == 304:
+                        return b"", dict(r.headers), 304
+                    if r.status != 200:
+                        raise FetchError(
+                            f"HTTP {r.status}; source refused or unavailable",
+                            r.status,
+                            retry_after_seconds(r.headers.get("Retry-After")),
+                        )
+                    chunks, size = [], 0
+                    async for chunk in r.content.iter_chunked(65536):
+                        size += len(chunk)
+                        if size > 5_000_000:
+                            raise FetchError("Source response exceeds 5 MB")
+                        chunks.append(chunk)
+                    return b"".join(chunks), dict(r.headers), r.status
         raise FetchError("Too many redirects")
 
     async def json(self, url: str, headers: dict | None = None):

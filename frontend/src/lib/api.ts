@@ -325,20 +325,6 @@ export type RuntimeReport = {
     input_tokens: number | null;
     output_tokens: number | null;
   };
-  collection_traffic?: {
-    basis: "http_response_body";
-    timezone: "UTC";
-    days: {
-      date: string;
-      requests: number;
-      received_bytes: number;
-      decoded_bytes: number;
-      measured_tasks: number;
-      unmeasured_tasks: number;
-      running_tasks: number;
-      unmeasured_responses: number;
-    }[];
-  };
 };
 export type Dashboard = {
   policy?: RecommendationPolicy;

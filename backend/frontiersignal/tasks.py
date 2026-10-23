@@ -13,7 +13,7 @@ from .config import Settings
 from .db import Database
 from .discovery_state import record_outcome
 from .models import AnalysisAttempt, Article, Repository, Source, TaskRun, now
-from .network import Fetcher, TransferMeter, transfer_meter
+from .network import Fetcher
 from .observability import record_runtime_sample
 from .projects import tracking_targets
 from .similarity import link_related
@@ -163,8 +163,6 @@ class TaskManager:
                 return run
 
     async def _run(self, run_id: str, source_id: str):
-        meter = TransferMeter()
-        token = transfer_meter.set(meter)
         try:
             async with self.semaphore, asyncio.timeout(self.settings.task_timeout):
                 async with self.db.sessions() as session:
@@ -265,13 +263,6 @@ class TaskManager:
             if isinstance(exc, FetchError):
                 message = str(exc)
             await self._fail(run_id, source_id, "failed", message[:500])
-        finally:
-            transfer_meter.reset(token)
-            async with self.db.sessions() as session:
-                run = await session.get(TaskRun, run_id)
-                if run:
-                    run.network_usage = meter.snapshot()
-                    await session.commit()
 
     async def _fail(self, run_id, source_id, status, message):
         async with self.db.sessions() as session:

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 const headers = { "X-FrontierSignal": "1" };
 
-test("GLM and Meta filters show real records and collection transfer is visible", async ({
+test("GLM and Meta filters show real records and publisher scan status", async ({
   page,
   request,
 }) => {
@@ -33,53 +33,6 @@ test("GLM and Meta filters show real records and collection transfer is visible"
   await expect(
     panel.getByText("Meta · facebook", { exact: true }),
   ).toBeVisible();
-  await panel.getByText("每日采集接收量（UTC）").click();
-  const table = panel.getByRole("table", { name: "每日采集流量记录" });
-  await expect(table.locator("tbody tr")).toHaveCount(7);
-  await expect(table.getByText(/MiB/).first()).toBeVisible();
-  for (const width of [1440, 1024]) {
-    await page.setViewportSize({ width, height: 1000 });
-    const containerBox = await panel.boundingBox();
-    const tableBox = await table.boundingBox();
-    expect(tableBox!.width).toBeGreaterThan(containerBox!.width * 0.9);
-    expect(tableBox!.x + tableBox!.width).toBeLessThanOrEqual(width);
-    const contrast = await panel
-      .locator(".coverage-traffic > p")
-      .evaluate((note) => {
-        const foreground = getComputedStyle(note)
-          .color.match(/[\d.]+/g)!
-          .slice(0, 3)
-          .map(Number);
-        const canvas = getComputedStyle(document.documentElement)
-          .getPropertyValue("--canvas")
-          .trim();
-        const background = canvas
-          .slice(1)
-          .match(/.{2}/g)!
-          .map((part) => parseInt(part, 16));
-        const luminance = (rgb: number[]) =>
-          rgb
-            .map((value) => {
-              const normalized = value / 255;
-              return normalized <= 0.04045
-                ? normalized / 12.92
-                : ((normalized + 0.055) / 1.055) ** 2.4;
-            })
-            .reduce(
-              (sum, value, index) =>
-                sum + value * [0.2126, 0.7152, 0.0722][index],
-              0,
-            );
-        const a = luminance(foreground),
-          b = luminance(background);
-        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-      });
-    expect(contrast).toBeGreaterThanOrEqual(4.5);
-    await page.screenshot({
-      path: `../.runtime/publishers-batch1-traffic-${width}.png`,
-      animations: "disabled",
-    });
-  }
 });
 
 test("recommendation shares persist and coverage reports actual observation", async ({
