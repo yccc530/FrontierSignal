@@ -22,6 +22,7 @@ import { useAction, useSources } from "../lib/hooks";
 import {
   Empty,
   ErrorNotice,
+  ReadIndicator,
   SourceMark,
   sourceLabel,
 } from "../components/common";
@@ -335,7 +336,7 @@ export default function Discover() {
                   {section.items.length ? (
                     section.items.map((item) => (
                       <article
-                        className="recommend-item"
+                        className={`recommend-item ${item.article.is_read ? "is-read" : ""}`}
                         key={item.article.id}
                         data-testid="recommendation-item"
                         data-article-id={item.article.id}
@@ -347,6 +348,7 @@ export default function Discover() {
                           />
                           <span>{sourceLabel(item.article.source.name)}</span>
                           <time>{articleTime(item.article)}</time>
+                          <ReadIndicator read={item.article.is_read} />
                         </div>
                         <button
                           className="recommend-title"

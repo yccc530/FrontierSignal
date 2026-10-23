@@ -1,10 +1,13 @@
 import {
   ArrowUpRight,
   Bookmark,
+  Eye,
   GitFork,
   History,
   MessageSquare,
+  Sparkles,
   Star,
+  TrendingUp,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,7 +19,8 @@ import {
   type Topic,
 } from "../lib/api";
 import { useAction } from "../lib/hooks";
-import { Empty, ErrorNotice, IconButton } from "./common";
+import { Empty, ErrorNotice, IconButton, ReadIndicator } from "./common";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -89,15 +93,15 @@ export function ProjectItem({
   const patch = useAction("PATCH");
   const { momentum } = project;
   const signal = momentum.signal;
-  const labels = {
-    surging: "加速上升",
-    rising: "快速增长",
-    new: "新项目观察",
-    watching: "持续跟踪",
-  };
+  const { label, icon: MomentumIcon } = {
+    surging: { label: "加速上升", icon: TrendingUp },
+    rising: { label: "快速增长", icon: ArrowUpRight },
+    new: { label: "新项目观察", icon: Sparkles },
+    watching: { label: "持续跟踪", icon: Eye },
+  }[momentum.status];
   return (
     <article
-      className={`project-item ${project.is_read ? "was-read" : ""}`}
+      className={`project-item ${project.is_read ? "is-read" : ""}`}
       data-testid="project-item"
       data-momentum={momentum.status}
     >
@@ -117,19 +121,26 @@ export function ProjectItem({
             project.name
           )}
         </button>
-        <a
-          href={project.url}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`打开 ${project.name} GitHub`}
-          title="打开 GitHub"
-        >
-          <ArrowUpRight size={17} />
-        </a>
+        <ReadIndicator read={project.is_read} />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              className="icon-button"
+              href={project.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`打开 ${project.name} GitHub`}
+            >
+              <ArrowUpRight size={17} />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent>打开 GitHub</TooltipContent>
+        </Tooltip>
       </div>
       <div className="momentum-meta">
         <span className={`momentum-state momentum-${momentum.status}`}>
-          {labels[momentum.status]}
+          <MomentumIcon size={14} aria-hidden="true" />
+          {label}
         </span>
         {momentum.acceleration !== null && (
           <span>速度 {momentum.acceleration.toFixed(2)} 倍</span>
@@ -151,6 +162,7 @@ export function ProjectItem({
       </div>
       <dl className="project-numbers">
         <div
+          className="project-metric-primary"
           title={
             signal
               ? `${dateTime(signal.start_at)} 至 ${dateTime(signal.end_at)}`
@@ -167,7 +179,7 @@ export function ProjectItem({
           </dd>
         </div>
         <div>
-          <dt>窗口平均 / 小时</dt>
+          <dt title="观测窗口内每小时平均 Stars 变化">平均 / 小时</dt>
           <dd>
             {signal ? (
               signal.rate_per_hour.toFixed(2)
@@ -208,7 +220,7 @@ export function ProjectItem({
               ` · ${signal.relative_label} ${signal.relative_percent}%`}
           </p>
         )}
-        <dl className="project-numbers">
+        <dl className="project-numbers project-numbers-detail">
           <Growth label="约24h " growth={project.growth_24h} />
           <Growth label="约7d " growth={project.growth_7d} />
         </dl>

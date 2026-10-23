@@ -92,7 +92,11 @@ export default function Settings() {
                 <div className="key-status">
                   <KeyRound size={16} />
                   <span>接口密钥</span>
-                  <strong>
+                  <strong
+                    className={
+                      query.data?.llm_key_configured ? undefined : "key-missing"
+                    }
+                  >
                     {query.data?.llm_key_configured ? "已配置" : "未配置"}
                   </strong>
                   <small>在本地 .env 设置 FS_LLM_API_KEY 后重启</small>

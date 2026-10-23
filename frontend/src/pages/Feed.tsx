@@ -33,6 +33,7 @@ import {
   Empty,
   ErrorNotice,
   IconButton,
+  ReadIndicator,
   SourceMark,
   Status,
   sourceLabel,
@@ -380,9 +381,7 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
                 <span>{sourceLabel(article.source.name)}</span>
                 <span className="meta-dot">·</span>
                 <time>{articleTime(article)}</time>
-                {!article.is_read && (
-                  <span className="unread-dot" aria-label="未读" />
-                )}
+                <ReadIndicator read={article.is_read} />
               </div>
               <button className="article-title" onClick={() => open(article)}>
                 {article.title_zh || article.title || "无标题内容"}

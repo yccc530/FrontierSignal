@@ -47,7 +47,7 @@ async function checkReadability(page: Page) {
       h1: 28,
       ".project-name, .article-title, .recommend-title": 17,
       ".project-description, .article-preview, .recommend-summary": 15,
-      ".nav-label, .page-heading p, .eyebrow, .muted, .recommend-meta, .article-meta, .technical-tags span, .project-footer > span, .project-numbers dt, .project-reason-preview, .data-table th, .source-cell small, .source-url, .task-id, .status-list dt, .status-list dd, .form-stack label, .key-status small, .interest-preview, .state-badge, .empty-state p, .error-banner, .model-tags span, .model-tags strong, .model-links a, .interest-options small": 13,
+      ".nav-label, .page-heading p, .eyebrow, .muted, .recommend-meta, .article-meta, .technical-tags span, .project-footer > span, .project-numbers dt, .project-reason-preview, .data-table th, .source-cell small, .source-url, .task-id, .status-list dt, .status-list dd, .form-stack label, .key-status small, .interest-preview, .state-badge, .empty-state p, .error-banner, .model-tags span, .model-tags strong, .model-links a, .interest-options small, .momentum-state, .unknown-growth, .notice, .warning-tag, .evidence-text, .model-caution, .source-mark, [data-slot=tooltip-content]": 13,
     };
     const issues: string[] = [];
     const ratios: number[] = [];
@@ -140,11 +140,29 @@ for (const width of [1024, 1440, 1920]) {
           if (element.children.length < 2) return true;
           const title = element.firstElementChild!.getBoundingClientRect();
           const actions = element.lastElementChild!.getBoundingClientRect();
-          return title.right <= actions.left;
+          return (
+            title.right <= actions.left && Math.abs(title.top - actions.top) < 1
+          );
         });
       expect(heading).toBe(true);
       await checkReadability(page);
       if (entry.route === "/") {
+        const aligned = await page
+          .locator(".recommend-heading")
+          .evaluateAll((headings) =>
+            headings.every((heading) => {
+              const title = heading.querySelector("h2")!;
+              const action = heading.querySelector(
+                ":scope > a, :scope > .section-count",
+              );
+              if (!action) return true;
+              const lineHeight = parseFloat(getComputedStyle(title).lineHeight);
+              const center = title.getBoundingClientRect().top + lineHeight / 2;
+              const bounds = action.getBoundingClientRect();
+              return Math.abs(center - (bounds.top + bounds.height / 2)) < 1;
+            }),
+          );
+        expect(aligned).toBe(true);
         const single = page.locator(".project-grid > .project-item:only-child");
         for (const item of await single.all()) {
           expect(
@@ -163,6 +181,31 @@ for (const width of [1024, 1440, 1920]) {
         });
         await page.getByText("研究偏好", { exact: true }).click();
       }
+      if (entry.route === "/sources" || entry.route === "/tasks") {
+        const table = page.locator(entry.ready);
+        const background = await table
+          .locator("th")
+          .first()
+          .evaluate((element) => getComputedStyle(element).backgroundColor);
+        const surface = await table.evaluate(
+          (element) =>
+            getComputedStyle(element.closest(".table-scroll")!).backgroundColor,
+        );
+        const row = table.locator("tbody tr").first();
+        await row.locator("td").first().hover();
+        const hover = await row.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        );
+        expect(new Set([background, surface, hover]).size).toBe(3);
+        expect(hover).not.toBe("rgba(0, 0, 0, 0)");
+        await expect(table.locator("th").first()).toHaveCSS(
+          "box-shadow",
+          "none",
+        );
+        await expect(row).toHaveCSS("box-shadow", "none");
+        await checkReadability(page);
+        await page.mouse.move(0, 0);
+      }
       if (entry.route.startsWith("/projects")) {
         const columns = await page
           .locator(".project-library")
@@ -171,6 +214,47 @@ for (const width of [1024, 1440, 1920]) {
               getComputedStyle(element).gridTemplateColumns.split(" ").length,
           );
         expect(columns).toBe(width === 1920 ? 4 : width === 1440 ? 3 : 2);
+        const metrics = await page
+          .locator(".project-item > .project-numbers")
+          .evaluateAll((groups) =>
+            groups.map((group) => {
+              const values = Array.from(group.querySelectorAll("dd"));
+              return {
+                columns:
+                  getComputedStyle(group).gridTemplateColumns.split(" ").length,
+                fontSizes: values.map(
+                  (value) => getComputedStyle(value).fontSize,
+                ),
+                tops: values.map((value) => value.getBoundingClientRect().top),
+                separated: Array.from(group.children)
+                  .slice(1)
+                  .every(
+                    (column) =>
+                      getComputedStyle(column).borderLeftWidth === "1px",
+                  ),
+              };
+            }),
+          );
+        for (const group of metrics) {
+          expect(group.columns).toBe(3);
+          expect(group.fontSizes).toEqual(["24px", "24px", "24px"]);
+          expect(
+            Math.max(...group.tops) - Math.min(...group.tops),
+          ).toBeLessThan(1);
+          expect(group.separated).toBe(true);
+        }
+        const card = page.getByTestId("project-item").first();
+        await card.locator("summary").click();
+        const details = card.locator(".project-numbers-detail");
+        await expect(details.locator("dt")).toHaveCount(2);
+        expect(
+          await details.evaluate(
+            (element) =>
+              getComputedStyle(element).gridTemplateColumns.split(" ").length,
+          ),
+        ).toBe(2);
+        await checkReadability(page);
+        await card.locator("summary").click();
         await page.screenshot({
           path: `../.runtime/ui-desktop-${width}-projects.png`,
           animations: "disabled",
@@ -252,7 +336,7 @@ test("recommendations expose loading, empty and request failure states", async (
   await checkReadability(page);
   await page.unroute("**/api/recommendations*");
   await page.reload();
-  await expect(page.locator(".interest-panel")).toBeVisible();
+  await expect(page.getByText("研究偏好", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.route("**/api/sources", (route) => route.fulfill({ json: [] }));
   await page.goto("about:blank");

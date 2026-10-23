@@ -144,6 +144,20 @@ describe("feed interactions using isolated fixtures", () => {
       screen.getByTestId("article-row").querySelector(".score-label"),
     ).toBeNull();
   });
+  it("updates the reading indicator from persisted state in both directions", async () => {
+    item.summary_zh = "阅读状态改变后仍然保留的摘要。";
+    mount();
+    expect(await screen.findByRole("img", { name: "未读" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "标为已读" }));
+    expect(await screen.findByRole("img", { name: "已读" })).toBeVisible();
+    expect(item.is_read).toBe(true);
+    expect(screen.getByTestId("article-row")).toHaveClass("is-read");
+    expect(screen.getByText(item.summary_zh!)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "标为未读" }));
+    expect(await screen.findByRole("img", { name: "未读" })).toBeVisible();
+    expect(item.is_read).toBe(false);
+    expect(screen.getByTestId("article-row")).not.toHaveClass("is-read");
+  });
   it("shows a real empty state with no invented articles", async () => {
     empty = true;
     mount();

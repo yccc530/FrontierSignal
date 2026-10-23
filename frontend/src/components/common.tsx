@@ -54,6 +54,17 @@ export function Status({ value }: { value: string }) {
     </Badge>
   );
 }
+export function ReadIndicator({ read }: { read: boolean }) {
+  const label = read ? "已读" : "未读";
+  return (
+    <span
+      className={`read-indicator ${read ? "is-read" : "is-unread"}`}
+      role="img"
+      aria-label={label}
+      title={label}
+    />
+  );
+}
 export function IconButton({
   label,
   active,
