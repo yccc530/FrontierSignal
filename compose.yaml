@@ -1,0 +1,20 @@
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: frontiersignal
+      POSTGRES_DB: frontiersignal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/setup.py first}
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U frontiersignal -d frontiersignal"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
