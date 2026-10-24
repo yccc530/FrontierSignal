@@ -33,6 +33,22 @@ export function Metrics({ article }: { article: Article }) {
   const metrics = article.metrics || {};
   return (
     <div className="intelligence-metrics">
+      {article.source.kind === "arxiv" &&
+        (typeof metrics.citations?.count === "number" ? (
+          <a
+            href={metrics.citations.url}
+            target="_blank"
+            rel="noreferrer"
+            title={`${metrics.citations.provider} · 观测于 ${dateTime(metrics.citations.observed_at || null)}${metrics.citations.status === "stale" ? " · 最近刷新失败，保留上次观测" : ""}`}
+          >
+            被引 {metrics.citations.count.toLocaleString()} 次{" "}
+            <ArrowUpRight size={13} />
+          </a>
+        ) : (
+          <span title={metrics.citations?.error || "尚未查询或引用索引未收录"}>
+            被引次数未知
+          </span>
+        ))}
       {typeof metrics.points === "number" && (
         <span>{metrics.points.toLocaleString()} points</span>
       )}

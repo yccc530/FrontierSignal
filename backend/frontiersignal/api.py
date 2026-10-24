@@ -7,7 +7,7 @@ from sqlalchemy import Text, cast, func, select, text
 from .collectors import COLLECTORS
 from .models import AnalysisAttempt, Article, ArticleLink, RawRecord, Source, TaskRun
 from .publishers import PUBLISHERS
-from .queries import article_query
+from .queries import article_query, article_timestamp
 from .schemas import ArticleOut, ArticlePage, SourceOut, SourcePatch, TaskOut
 from .topics import TOPICS, collection_topics
 
@@ -39,9 +39,9 @@ async def sources(request: Request):
 
 
 @router.post("/sources/{source_id}/collect", response_model=TaskOut, status_code=202)
-async def collect(source_id: str, request: Request):
+async def collect(source_id: str, request: Request, publisher: str | None = None):
     try:
-        return await request.app.state.tasks.submit(source_id)
+        return await request.app.state.tasks.submit(source_id, publisher)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from None
     except ValueError as exc:
@@ -122,7 +122,18 @@ async def articles(
     favorite: bool | None = None,
     read: bool | None = None,
     status: Literal["pending", "processing", "analyzed", "filtered", "failed"] | None = None,
-    sort: Literal["published", "score", "technical"] = "published",
+    sort: Literal[
+        "published",
+        "oldest",
+        "collected",
+        "score",
+        "technical",
+        "citations",
+        "downloads",
+        "likes",
+        "points",
+        "comments",
+    ] = "published",
     technical: bool | None = None,
     topic: str | None = None,
     content_type: Literal["models", "tools", "projects", "workflows", "papers", "datasets"]
@@ -171,13 +182,39 @@ async def articles(
         elif content_type == "datasets":
             query = query.where(Article.metrics["kind"].as_string() == "dataset")
         if publisher:
-            query = query.where(Article.metrics["model"]["publisher_id"].as_string() == publisher)
+            query = query.where(
+                func.coalesce(
+                    Article.metrics["model"]["publisher_id"].as_string(),
+                    Article.metrics["publisher_id"].as_string(),
+                    select(Source.config["publisher_id"].as_string())
+                    .where(Source.id == Article.source_id)
+                    .scalar_subquery(),
+                )
+                == publisher
+            )
+        if sort == "citations":
+            query = query.where(Article.source.has(kind="arxiv"))
+        elif sort in {"downloads", "likes"}:
+            query = query.where(Article.source.has(Source.kind.in_(["hf_models", "hf_datasets"])))
+        elif sort in {"points", "comments"}:
+            query = query.where(Article.source.has(kind="hackernews"))
         total = await session.scalar(select(func.count()).select_from(query.subquery()))
-        ordering = [func.coalesce(Article.published_at, Article.collected_at).desc(), Article.id]
+        ordering = [article_timestamp().desc(), Article.id]
         if sort == "score":
             ordering.insert(0, Article.score.desc().nulls_last())
         elif sort == "technical":
             ordering.insert(0, Article.technical_score.desc())
+        elif sort == "oldest":
+            ordering = [article_timestamp().asc(), Article.id]
+        elif sort == "collected":
+            ordering = [Article.collected_at.desc(), Article.id]
+        elif sort == "citations":
+            ordering.insert(
+                0, Article.metrics["citations"]["count"].as_integer().desc().nulls_last()
+            )
+        elif sort in {"downloads", "likes", "points", "comments"}:
+            key = "comments_count" if sort == "comments" else sort
+            ordering.insert(0, Article.metrics[key].as_integer().desc().nulls_last())
         rows = (
             await session.scalars(
                 query.order_by(*ordering).offset((page - 1) * page_size).limit(page_size)

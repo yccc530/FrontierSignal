@@ -117,6 +117,7 @@ class HuggingFaceCollector:
     def __init__(self, fetcher):
         self.fetcher = fetcher
         self.known_cards: dict[str, dict] = {}
+        self.publisher_id: str | None = None
 
     async def collect(self, source):
         if source.kind == "hf_datasets":
@@ -131,10 +132,34 @@ class HuggingFaceCollector:
         priorities = {}
         memberships = {}
         responses = {}
-        for step in range(config.hf_queries_per_run):
-            group, params = model_query(
-                source, tick + step, min(config.hf_candidates_per_query, config.max_items)
-            )
+        limit = min(config.hf_candidates_per_query, config.max_items)
+        if self.publisher_id:
+            authors = publisher_authors(PUBLISHERS[self.publisher_id])
+            groups = [
+                group for group in model_groups(source) if group["params"].get("author") in authors
+            ]
+            if not groups:
+                raise ValueError("该厂商与当前来源采集范围无交集")
+            queries = [
+                (
+                    group,
+                    {
+                        **group["params"],
+                        "sort": order,
+                        "direction": -1,
+                        "limit": limit,
+                        "full": "true",
+                        "cardData": "true",
+                    },
+                )
+                for order in ("createdAt", "lastModified")
+                for group in groups
+            ][: config.hf_queries_per_run]
+        else:
+            queries = [
+                model_query(source, tick + step, limit) for step in range(config.hf_queries_per_run)
+            ]
+        for group, params in queries:
             try:
                 url = "https://huggingface.co/api/models?" + urlencode(params)
                 if url not in responses:
@@ -281,7 +306,7 @@ class HuggingFaceCollector:
         for item in result.items:
             item.metrics["discovery_groups"] = sorted(memberships.get(item.platform_id, []))
         result.cursor = {
-            "model_tick": tick + config.hf_queries_per_run,
+            "model_tick": tick if self.publisher_id else tick + config.hf_queries_per_run,
             "scans": {
                 key: value
                 for key, value in scans.items()

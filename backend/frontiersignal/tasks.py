@@ -132,7 +132,7 @@ class TaskManager:
             if await AnalysisPipeline(self.db, self.settings).pending_ids():
                 await self.submit_analysis()
 
-    async def submit(self, source_id: str) -> TaskRun:
+    async def submit(self, source_id: str, publisher: str | None = None) -> TaskRun:
         async with self.lock:
             await self.ensure_owner()
             if self.closing:
@@ -145,6 +145,15 @@ class TaskManager:
                     raise ValueError("Source is disabled")
                 if source.kind not in COLLECTORS:
                     raise ValueError("该平台当前未接入，不创建采集任务")
+                if publisher:
+                    from .publishers import PUBLISHERS, publisher_authors
+
+                    if (
+                        source.kind != "hf_models"
+                        or publisher not in PUBLISHERS
+                        or not publisher_authors(PUBLISHERS[publisher])
+                    ):
+                        raise ValueError("该来源不支持所选厂商的模型采集")
                 existing = await session.scalar(
                     select(TaskRun).where(
                         TaskRun.source_id == source_id,
@@ -153,16 +162,18 @@ class TaskManager:
                     )
                 )
                 if existing:
+                    if publisher:
+                        raise ValueError("模型来源已有任务运行，请结束后再采集指定团队")
                     return existing
                 run = TaskRun(source_id=source_id)
                 session.add(run)
                 await session.commit()
-                worker = asyncio.create_task(self._run(run.id, source_id))
+                worker = asyncio.create_task(self._run(run.id, source_id, publisher))
                 self.workers.add(worker)
                 worker.add_done_callback(self.workers.discard)
                 return run
 
-    async def _run(self, run_id: str, source_id: str):
+    async def _run(self, run_id: str, source_id: str, publisher: str | None = None):
         try:
             async with self.semaphore, asyncio.timeout(self.settings.task_timeout):
                 async with self.db.sessions() as session:
@@ -178,6 +189,7 @@ class TaskManager:
                         raise ValueError(f"Unsupported collector: {source.kind}")
                     collector = collector_type(self.fetcher)
                     if isinstance(collector, HuggingFaceCollector) and source.kind == "hf_models":
+                        collector.publisher_id = publisher
                         cached = (
                             await session.execute(
                                 select(Article.platform_id, Article.metrics)
@@ -226,6 +238,8 @@ class TaskManager:
                                 run.filtered += 1
                         except Exception as exc:
                             run.failed += 1
+                            if source.kind == "official":
+                                collection.cursor.get("pages", {}).pop(item.url, None)
                             record_outcome(
                                 collection.cursor,
                                 item.metrics.get("discovery_groups", []),

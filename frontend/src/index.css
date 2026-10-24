@@ -436,7 +436,7 @@ h1 {
 }
 
 select,
-input:not(.search-field input):not([type="checkbox"]),
+input:not(.search-field input):not([type="checkbox"]):not([type="radio"]),
 textarea {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);

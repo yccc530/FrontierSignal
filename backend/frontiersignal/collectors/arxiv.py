@@ -1,6 +1,7 @@
 import asyncio
 from urllib.parse import urlencode
 
+from ..citations import enrich_papers
 from ..discovery_state import record_scan
 from ..normalizer import plain_text
 from ..technical import technical_signal
@@ -17,6 +18,10 @@ def research_groups(source):
 
 class ArxivCollector(RSSCollector):
     async def collect(self, source):
+        result = await self.collect_papers(source)
+        return await enrich_papers(result, source, self.fetcher)
+
+    async def collect_papers(self, source):
         if not (source.config or {}).get("research_queries"):
             return await super().collect(source)
         topics = selected_topics(source)

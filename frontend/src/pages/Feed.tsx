@@ -42,6 +42,7 @@ import ArticleDetail from "../components/ArticleDetail";
 import { Metrics } from "../components/Intelligence";
 import ModelFacts from "../components/ModelFacts";
 import ContentFacts from "../components/ContentFacts";
+import FeedFacets from "../components/FeedFacets";
 
 export default function Feed({ favorite = false }: { favorite?: boolean }) {
   const [params, setParams] = useSearchParams();
@@ -96,6 +97,32 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
       const next = new URLSearchParams(previous);
       value ? next.set(key, value) : next.delete(key);
       if (key !== "page") next.delete("page");
+      if (
+        ["source", "content_type", "publisher"].includes(key) &&
+        ["citations", "downloads", "likes", "points", "comments"].includes(
+          next.get("sort") || "",
+        )
+      )
+        next.delete("sort");
+      if (key === "sort" && value === "citations") {
+        next.set("content_type", "papers");
+        if (
+          sources.data?.find((source) => source.id === next.get("source"))
+            ?.kind !== "arxiv"
+        )
+          next.delete("source");
+        next.delete("publisher");
+      } else if (key === "sort" && ["downloads", "likes"].includes(value)) {
+        const datasets =
+          next.get("content_type") === "datasets" ||
+          next.get("source") === "hf-datasets";
+        next.set("content_type", datasets ? "datasets" : "models");
+        next.set("source", datasets ? "hf-datasets" : "hf-models");
+      } else if (key === "sort" && ["points", "comments"].includes(value)) {
+        next.set("source", "hackernews");
+        next.delete("content_type");
+        next.delete("publisher");
+      }
       return next;
     });
   const submitSearch = (event: FormEvent) => {
@@ -151,7 +178,8 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
           patch.error ||
           sources.error ||
           topics.error ||
-          publishers.error
+          publishers.error ||
+          categories.error
         }
       />
       {(collect.isSuccess || analyze.isSuccess) && (
@@ -200,18 +228,6 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
             </option>
           ))}
         </select>
-        <select
-          aria-label="按类别筛选"
-          value={params.get("category") || ""}
-          onChange={(event) => change("category", event.target.value)}
-        >
-          <option value="">全部类别</option>
-          {categories.data?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
         <IconButton
           label="更多筛选"
           active={expanded}
@@ -238,36 +254,52 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
           </select>
         </label>
         <label>
-          主题
+          排序
           <select
-            aria-label="资讯技术主题"
-            value={params.get("topic") || ""}
-            onChange={(event) => change("topic", event.target.value)}
+            aria-label="排序方式"
+            value={params.get("sort") || "published"}
+            onChange={(e) => change("sort", e.target.value)}
           >
-            <option value="">全部技术方向</option>
-            {topics.data?.map((topic) => (
-              <option key={topic.id} value={topic.id}>
-                {topic.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          发布团队
-          <select
-            aria-label="模型发布团队"
-            value={params.get("publisher") || ""}
-            onChange={(event) => change("publisher", event.target.value)}
-          >
-            <option value="">全部团队 / 社区</option>
-            {publishers.data?.map((publisher) => (
-              <option key={publisher.id} value={publisher.id}>
-                {publisher.label}
-              </option>
-            ))}
+            <option value="published">最新发布 / 来源时间</option>
+            <option value="oldest">最早发布 / 来源时间</option>
+            <option value="collected">最近收录</option>
+            <option value="score">重要性优先</option>
+            <option value="technical">技术相关性</option>
+            <option value="citations">论文 · 被引次数</option>
+            <option value="downloads">Hub 资源 · 下载量</option>
+            <option value="likes">Hub 资源 · 喜欢数</option>
+            <option value="points">HN 讨论 · Points</option>
+            <option value="comments">HN 讨论 · 评论数</option>
           </select>
         </label>
       </div>
+      <FeedFacets
+        publishers={publishers.data || []}
+        topics={topics.data || []}
+        categories={categories.data || []}
+        params={params}
+        onChange={change}
+      />
+      {publishers.data?.find((team) => team.id === params.get("publisher"))
+        ?.author && (
+        <button
+          className="secondary-button"
+          disabled={
+            collect.isPending ||
+            !sources.data?.some(
+              (source) => source.id === "hf-models" && source.enabled,
+            )
+          }
+          onClick={() =>
+            collect.mutate({
+              path: `/sources/hf-models/collect?publisher=${encodeURIComponent(params.get("publisher") || "")}`,
+            })
+          }
+        >
+          <ArrowDownToLine size={16} />
+          采集该团队模型
+        </button>
+      )}
       {expanded && (
         <div className="filter-panel">
           <label>
@@ -338,15 +370,6 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
           {favorite ? "收藏资讯" : "全部资讯"}
           <span>{articles.data?.total ?? "—"}</span>
         </strong>
-        <select
-          aria-label="排序方式"
-          value={params.get("sort") || "published"}
-          onChange={(e) => change("sort", e.target.value)}
-        >
-          <option value="published">最新发布 / 收录</option>
-          <option value="score">重要性优先</option>
-          <option value="technical">技术相关性</option>
-        </select>
       </div>
       <div className="feed-layout">
         <section className="feed-list" aria-label="资讯列表">

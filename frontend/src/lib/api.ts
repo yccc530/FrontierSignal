@@ -23,6 +23,7 @@ export type Article = {
   original_url: string | null;
   author: string | null;
   published_at: string | null;
+  source_updated_at?: string | null;
   collected_at: string;
   status: string;
   is_read: boolean;
@@ -122,6 +123,16 @@ export type TaskRun = {
   error: string | null;
 };
 export type ArticleMetrics = {
+  publisher_id?: string;
+  citations?: {
+    count: number | null;
+    provider: string;
+    url?: string;
+    observed_at?: string;
+    checked_at: string;
+    status: string;
+    error?: string;
+  };
   kind?: string;
   points?: number | null;
   comments_count?: number | null;
@@ -192,6 +203,7 @@ export type ModelInfo = {
   paper_url: string | null;
 };
 export type Publisher = {
+  region?: "china" | "global";
   id: string;
   label: string;
   author: string | null;
@@ -389,7 +401,10 @@ export const dateTime = (value: string | null) =>
 export function articleTime(article: Article): string {
   const model = article.metrics?.model;
   if (article.source.kind === "hf_models") {
-    const updated = model?.hub_updated_at || article.metrics?.updated_at;
+    const updated =
+      article.source_updated_at ||
+      model?.hub_updated_at ||
+      article.metrics?.updated_at;
     return updated
       ? `Hub 更新 ${dateTime(updated)}`
       : `首次发现 ${dateTime(article.collected_at)}`;

@@ -6,6 +6,10 @@ from sqlalchemy import func, or_, select
 from .models import Article
 
 
+def article_timestamp():
+    return func.coalesce(Article.published_at, Article.source_updated_at, Article.collected_at)
+
+
 def article_query(
     q: str = "",
     source: str | None = None,
@@ -28,7 +32,7 @@ def article_query(
         statement = statement.where(Article.is_read == read)
     if status:
         statement = statement.where(Article.status == status)
-    timestamp = func.coalesce(Article.published_at, Article.collected_at)
+    timestamp = article_timestamp()
     if after:
         statement = statement.where(timestamp >= after)
     if before:

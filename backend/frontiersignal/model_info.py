@@ -11,15 +11,18 @@ from .topics import CATALOG, PATTERNS, collection_topics
 
 HUB_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*")
 MODEL_FAMILY = re.compile(
-    r"\b(?:gpt|gemini|gemma|claude|qwen|deepseek|mistral|phi|llama|chatglm|glm)[ -]?(?:v)?\d", re.I
+    r"\b(?:(?:gpt|gemini|gemma|claude(?:[ -](?:opus|sonnet|haiku))?|qwen|deepseek|mistral|phi|llama|chatglm|glm|kimi[ -]?k|minimax[ -]?m|step|ernie|internlm|internvl|seed(?:[ -]?oss)?|grok)[ -]?(?:v)?\d|nova\b|command[ -](?:r|a)\b|nemotron\b)",
+    re.I,
 )
 CREATIVE_FAMILIES = {
     "3d": re.compile(r"\b(?:hunyuan3d|trellis)(?:[. _-]|$)", re.I),
     "image": re.compile(
-        r"\b(?:flux[. -]?\d|stable diffusion|imagen|qwen.image|cogview[\d.]*|glm.image)\b", re.I
+        r"\b(?:flux[. -]?\d|stable diffusion|imagen|qwen.image|cogview[\d.]*|glm.image|seedream[\d. -]*)\b",
+        re.I,
     ),
     "video": re.compile(
-        r"\b(?:sora|veo|wan[. -]?\d|hunyuanvideo|ltx[. -]?(?:video|\d)|cogvideox?[\d.-]*)\b", re.I
+        r"\b(?:sora|veo|wan[. -]?\d|hunyuanvideo|ltx[. -]?(?:video|\d)|cogvideox?[\d.-]*|seedance[\d. -]*)\b",
+        re.I,
     ),
     "audio": re.compile(
         r"\b(?:whisper|stable audio|cosyvoice|ace.step|musicgen|qwen[\d.]*.tts|glm[\d.-]*.(?:voice|tts)|audiocraft|audiobox)\b",
@@ -268,6 +271,7 @@ def annotate_official_model(item, source):
     publisher_id = (source.config or {}).get("publisher_id")
     if source.trust != "official" or publisher_id not in PUBLISHERS:
         return
+    item.metrics["publisher_id"] = publisher_id
     title = item.title or ""
     text = f"{title}\n{item.body}"
     refs = []
@@ -287,11 +291,33 @@ def annotate_official_model(item, source):
     model_title = (
         creative or MODEL_FAMILY.search(title) or re.search(r"\bmodel\b|模型", title, re.I)
     )
+    branded = {
+        "anthropic": r"\bclaude\b",
+        "xai": r"\bgrok\b",
+        "amazon": r"\bnova\b",
+    }
+    model_title = model_title or bool(re.search(branded.get(publisher_id, r"(?!)"), title, re.I))
+    if re.search(
+        r"model (?:vault|catalog|registry|gateway)|模型(?:平台|网关|目录|仓库)", title, re.I
+    ):
+        model_title = False
+    if re.search(r"\bclaude code\b", title, re.I) and not MODEL_FAMILY.search(title):
+        model_title = False
+    # A provider hosting someone else's model is not that model's publisher.
+    if publisher_id == "amazon" and re.search(
+        r"\b(?:claude|llama|qwen|gpt|deepseek)\b", title, re.I
+    ):
+        model_title = False
     action = re.search(
-        r"introduc\w*|releas\w*|launch\w*|announc\w*|available|preview|update|发布|推出|更新|预览|上线|开源|built to",
+        r"introduc\w*|releas\w*|launch\w*|announc\w*|available|preview|update|\bmeet\b|发布|推出|更新|预览|上线|开源|built to",
         title,
         re.I,
     )
+    if not action and MODEL_FAMILY.match(title):
+        introduction = BeautifulSoup(item.body, "html.parser").get_text(" ", strip=True)[:1500]
+        action = re.search(
+            r"introduc\w*|announc\w*|releas\w*|now available|发布|推出", introduction, re.I
+        )
     if not model_title or not action:
         if refs:
             item.metrics["model_references"] = list(dict.fromkeys(refs))[:12]
@@ -318,7 +344,7 @@ def annotate_official_model(item, source):
         "access": "unknown",
         "license": None,
         "release_status": status,
-        "release_evidence": f"官方标题中的表述：{evidence}",
+        "release_evidence": f"官方标题或导语中的表述：{evidence}",
         "release_at": item.published_at.isoformat()
         if item.published_at and item.metrics.get("feed_time_kind") == "published"
         else None,

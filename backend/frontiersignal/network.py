@@ -11,6 +11,12 @@ import aiohttp
 from .config import Settings
 
 DEFAULT_HOSTS = {
+    "www.anthropic.com",
+    "cohere.com",
+    "seed.bytedance.com",
+    "x.ai",
+    "aws.amazon.com",
+    "api.openalex.org",
     "huggingface.co",
     "openai.com",
     "deepmind.google",
@@ -43,7 +49,9 @@ def validate_feed_url(url: str, hosts: set[str]) -> None:
 class PublicResolver(aiohttp.resolver.ThreadedResolver):
     async def resolve(self, host, port=0, family=0):
         records = await super().resolve(host, port, family)
-        if not records or any(not ipaddress.ip_address(r["host"]).is_global for r in records):
+        # Only these validated addresses reach the connector (or the proxy CONNECT target).
+        records = [record for record in records if ipaddress.ip_address(record["host"]).is_global]
+        if not records:
             raise ValueError("Feed DNS resolved to a non-public address")
         return records
 

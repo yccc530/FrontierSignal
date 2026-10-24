@@ -3,10 +3,12 @@ from .github import GitHubCollector
 from .github_discovery import GitHubDiscoveryCollector
 from .hackernews import HackerNewsCollector
 from .huggingface import HuggingFaceCollector
+from .official import OfficialCollector
 from .rss import RSSCollector
 
 COLLECTORS = {
     "rss": RSSCollector,
+    "official": OfficialCollector,
     "arxiv": ArxivCollector,
     "hackernews": HackerNewsCollector,
     "github": GitHubCollector,

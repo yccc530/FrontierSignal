@@ -81,8 +81,23 @@ beforeEach(() => {
         };
       else if (url.pathname === "/api/sources") value = [source];
       else if (url.pathname === "/api/categories") value = [];
-      else if (["/api/topics", "/api/publishers"].includes(url.pathname))
-        value = [];
+      else if (url.pathname === "/api/publishers")
+        value = [
+          {
+            id: "kimi",
+            label: "月之暗面 Kimi",
+            region: "china",
+            author: "moonshotai",
+          },
+          {
+            id: "anthropic",
+            label: "Anthropic · Claude",
+            region: "global",
+            author: null,
+          },
+        ];
+      else if (url.pathname === "/api/topics")
+        value = [{ id: "llm", label: "大模型" }];
       else if (url.pathname === "/api/settings")
         value = { llm_configured: false };
       else if (url.pathname === "/api/stats")
@@ -119,6 +134,73 @@ function mount() {
   );
 }
 describe("feed interactions using isolated fixtures", () => {
+  it("filters publishers and topics in a grid and clears the selected facet", async () => {
+    mount();
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "月之暗面 Kimi" }),
+    );
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(([path]) => String(path).includes("publisher=kimi")),
+      ).toBe(true),
+    );
+    fireEvent.keyDown(screen.getByRole("tab", { name: /发布团队/ }), {
+      key: "ArrowRight",
+    });
+    expect(screen.getByRole("tab", { name: /技术方向/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "大模型" }));
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(([path]) => String(path).includes("topic=llm")),
+      ).toBe(true),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "清除发布团队" }));
+    expect(
+      screen.queryByRole("button", { name: "清除发布团队" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "大模型" })).toBeChecked();
+  });
+  it("scopes citation and platform popularity sorts to the matching content", async () => {
+    mount();
+    await screen.findByText("Test AI story");
+    fireEvent.change(screen.getByLabelText("排序方式"), {
+      target: { value: "citations" },
+    });
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([path]) =>
+              String(path).includes("sort=citations") &&
+              String(path).includes("content_type=papers"),
+          ),
+      ).toBe(true),
+    );
+    expect(screen.getByLabelText("资讯内容类型")).toHaveValue("papers");
+    fireEvent.change(screen.getByLabelText("排序方式"), {
+      target: { value: "points" },
+    });
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([path]) =>
+              String(path).includes("sort=points") &&
+              String(path).includes("source=hackernews"),
+          ),
+      ).toBe(true),
+    );
+    expect(screen.getByLabelText("资讯内容类型")).toHaveValue("");
+  });
   it("prefers the persisted Chinese title and summary", async () => {
     item.title_zh = "测试模型发布";
     item.summary_zh = "来自真实接口字段的中文摘要测试夹具。";

@@ -233,6 +233,7 @@ dependencies = [
     { name = "httpx" },
     { name = "pgvector" },
     { name = "platformdirs" },
+    { name = "protego" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
     { name = "simhash" },
@@ -259,6 +260,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "pgvector", specifier = ">=0.4,<1" },
     { name = "platformdirs", specifier = ">=4,<5" },
+    { name = "protego", specifier = ">=0.4,<1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic-settings", specifier = ">=2.7,<3" },
     { name = "simhash", specifier = "==2.1.2" },
@@ -534,6 +536,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0a/8a/3db6a3543d8101263b4c52978b6276a04ead2caff2c5ab880d934f47bd89/propcache-0.5.4-cp311-cp311-win_amd64.whl", hash = "sha256:e904d4d01f36bd6e197590be1533c44e06058771e0746dd073a8ebb3ef880858", size = 46268, upload-time = "2026-09-16T00:14:26.996Z" },
     { url = "https://files.pythonhosted.org/packages/41/07/5222e2665bbf6e45847492ecbf3b9f3e4975a0ae300e5fd465df7d48ce55/propcache-0.5.4-cp311-cp311-win_arm64.whl", hash = "sha256:d42a9a856a4a6e2f6c10f1318c07e7daa498d6593abe745c71dae4521a26ca39", size = 43547, upload-time = "2026-09-16T00:14:28.143Z" },
     { url = "https://files.pythonhosted.org/packages/f5/cd/785c64ed382f3f04201870267b02783f63b4678c2acfddc177a3ebcc2727/propcache-0.5.4-py3-none-any.whl", hash = "sha256:62c60aec739ed00124573cce1178138fd690c7676352d67a37328c1cf51d7468", size = 16338, upload-time = "2026-09-16T00:17:13.106Z" },
+]
+
+[[package]]
+name = "protego"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/d9/5026b9e75db1172f02441a84eaf42efb199b4cea14dda7651a620d1acd40/protego-0.7.0.tar.gz", hash = "sha256:2c032d9736a1f4f0c4318f3558353ae34da5cd038f1a5e064ded7548df315e5a", size = 3144321, upload-time = "2026-09-21T10:54:00.107Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c0/20/e4382a85e4cf4746d11746481f83360b990165725dd36ba73d55e029e6a9/protego-0.7.0-py3-none-any.whl", hash = "sha256:944638aaee608f6c83fcad442695f3f9381a60be8d5007248f46b00f201fa5fc", size = 13714, upload-time = "2026-09-21T10:53:58.812Z" },
 ]
 
 [[package]]

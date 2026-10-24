@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     task_timeout: int = Field(180, ge=10, le=600)
     collector_concurrency: int = Field(3, ge=1, le=8)
     max_items: int = Field(30, ge=1, le=100)
+    citation_checks: int = Field(2, ge=0, le=5)
     llm_base_url: str = ""
     llm_api_key: SecretStr = SecretStr("")
     llm_model: str = ""

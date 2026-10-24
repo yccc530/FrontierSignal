@@ -149,6 +149,18 @@ uv run python scripts/verify_model_sources.py --publishers zai meta --rounds 2
 
 ## API 调试
 
+第二、三批真实来源验证（服务已启动，命令兼容 WSL 与 PowerShell）：
+
+```text
+uv run python scripts/verify_publishers.py
+uv run python scripts/refresh_citations.py --limit 10
+```
+
+前者按顺序触发 11 个厂商模型采集和 4 个官方资讯任务，报告在 `.runtime/publishers-batch23-verification.json`，不主动调用付费 LLM。
+后者最多查询十条已入库论文，只更新引用元数据，保留阅读状态、原文和分析；未收录会明确报告 unavailable。
+`test_official_citations.py` 覆盖账号归属、robots 限制、部分失败、页面缓存、日期、精确引用匹配、未知值排序与分页。
+桌面 `publishers.spec.ts` 检查 1024/1440px 分类网格和真实引用排序，使用实际本地数据库，不预置业务样本。
+
 应用启动后可访问 `http://localhost:8000/docs` 查看 OpenAPI，`/openapi.json` 为接口契约。
 
 写入接口要求请求头 `X-FrontierSignal: 1`；只允许配置中的本机 Origin。Swagger 页面不会自动添加该自定义头，写操作调试需使用能显式设置请求头的客户端。这里的限制不是远程账户认证，不应据此公开部署。

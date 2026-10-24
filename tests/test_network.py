@@ -36,3 +36,11 @@ async def test_transient_http_retry_and_long_rate_limit(monkeypatch):
         await fetcher.get("https://huggingface.co/feed")
     assert retry_after_seconds("120") == 120
     assert retry_after_seconds("nan") == 0
+
+
+async def test_mixed_dns_answers_never_pass_private_or_reserved_addresses(monkeypatch):
+    async def resolve(self, host, port=0, family=0):
+        return [{"host": address} for address in ["127.0.0.1", "2001::c760:3b13", "1.1.1.1"]]
+
+    monkeypatch.setattr(ThreadedResolver, "resolve", resolve)
+    assert await PublicResolver().resolve("feed.example", 443) == [{"host": "1.1.1.1"}]

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .content_info import content_metadata
 from .models import Article, RawRecord, Source, now
 from .normalizer import RawItem, digest, normalize
-from .projects import store_repository
+from .projects import parse_time, store_repository
 from .technical import technical_signal
 
 
@@ -78,6 +78,16 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
         if updated_metrics != article.metrics:
             article.updated_at = now()
         article.metrics = updated_metrics
+        if source.kind in {"hf_models", "hf_datasets"}:
+            value = (updated_metrics.get("model") or {}).get(
+                "hub_updated_at"
+            ) or updated_metrics.get("updated_at")
+            try:
+                source_updated = parse_time(value)
+            except (ValueError, TypeError, AttributeError):
+                source_updated = None
+            if source_updated:
+                article.source_updated_at = source_updated
         if source.kind == "hf_models" and item.metrics.get("model"):
             # Hub creation is not a model's announced release date, including legacy records.
             article.published_at = None
@@ -122,6 +132,8 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
 
 
 async def seed_sources(session: AsyncSession) -> None:
+    from .collectors.official import OFFICIAL_SITES
+
     defaults = [
         dict(
             id="arxiv-research",
@@ -240,6 +252,35 @@ async def seed_sources(session: AsyncSession) -> None:
         )
         for category in ["cs.LG", "cs.CL", "cs.CV"]
     )
+    defaults.append(
+        dict(
+            id="amazon-science",
+            name="Amazon AI 官方技术博客",
+            kind="rss",
+            url="https://aws.amazon.com/blogs/machine-learning/feed/",
+            trust="official",
+            interval_minutes=360,
+            config={"publisher_id": "amazon"},
+        )
+    )
+    for publisher, (url, _, _) in OFFICIAL_SITES.items():
+        from .publishers import PUBLISHERS
+
+        defaults.append(
+            dict(
+                id=f"{publisher}-news",
+                name=f"{PUBLISHERS[publisher]['label']} 官方发布",
+                kind="official",
+                url=url,
+                trust="official",
+                interval_minutes=360,
+                enabled=publisher != "xai",
+                config={"publisher_id": publisher},
+                last_error="发布页当前拒绝公开请求（HTTP 403）；自动采集未启用"
+                if publisher == "xai"
+                else None,
+            )
+        )
     for value in defaults:
         existing = await session.get(Source, value["id"])
         if not existing:

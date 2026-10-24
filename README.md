@@ -58,13 +58,13 @@ Manage enabled sources, automatic collection, and intervals. Review successful r
 | Read technical intelligence | Generate Chinese titles, summaries, categories, and importance scores with a configurable LLM while retaining originals and evidence links |
 | Build a research library    | Search, filter, bookmark, and track read status across recommendations, projects, and articles                                             |
 | Set research priorities     | Configure collection scope, research interests, recommendation counts, and topic allocation independently                                  |
-| Inspect collection activity | Review task results, errors, source coverage, star history, and model calls                     |
+| Inspect collection activity | Review task results, errors, source coverage, star history, and model calls                                                                |
 
 **An LLM is optional for collection, search, and reading.** Configure one to generate Chinese analysis. Failed model calls leave the original records intact and can be retried individually.
 
 ## Data Sources
 
-The application includes **16 default source configurations and 30 technical topics**, using official APIs and public RSS/Atom feeds where available.
+The application includes **21 source configurations, 27 publisher entries, and 30 technical topics**. It uses official APIs, public RSS/Atom feeds, and reviewed public announcement pages. The xAI news-page source is disabled by default because it currently rejects requests.
 
 | Source                   | Collected information                                                                                                   |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
@@ -72,13 +72,15 @@ The application includes **16 default source configurations and 30 technical top
 | Hacker News              | AI technical posts, points, comment counts, and bounded comment samples                                                 |
 | arXiv                    | `cs.AI`, `cs.LG`, `cs.CL`, `cs.CV`, and focused engineering and scientific research queries                             |
 | Hugging Face             | Models, datasets, model cards, and official blog posts, with priority tracking for official GLM and Meta model accounts |
-| Official technical blogs | OpenAI, Google DeepMind, Google AI, and NVIDIA                                                                          |
+| Official technical blogs | OpenAI, Google DeepMind, Google AI, NVIDIA, Anthropic, Cohere, Amazon, and ByteDance Seed                               |
 
 Topics include LLMs, agents, training and inference, RAG, multimodal and coding models, OCR, image/video/audio generation, 3D/CAD, world models, robotics, vibe coding, MCP/skills, development tools, and AI for science.
 
 To browse GLM or Meta, open **Articles (资讯库)**, select **Model news (模型资讯)**, and filter the publisher to **智谱 / Z.ai** or **Meta**. These accounts share the existing request budget; collection does not download model weights. Source coverage reports the latest successful scan and any collection errors for each priority account.
 
-GitHub rankings are derived from official API data and recorded observations; they are not GitHub Trending rankings. Growth remains unknown until sufficient history exists, and high lifetime star counts do not automatically fill the growth list. X and Reddit are not integrated. Anthropic does not yet have a verified default feed. See [data sources and limitations](docs/data-sources.md) for details.
+The publisher catalog also includes Kimi, MiniMax, StepFun, Baidu, Intern, Hunyuan, and NVIDIA model accounts. A grouped grid lets you filter teams, topics, and categories without scrolling through long dropdowns. Sort by time, importance, technical relevance, paper citations, or source-specific popularity. Citation counts come from exact arXiv lookups in OpenAlex; unavailable counts remain unknown, and observations link to their source. New papers may not yet be indexed.
+
+GitHub rankings are derived from official API data and recorded observations; they are not GitHub Trending rankings. Growth remains unknown until sufficient history exists, and high lifetime star counts do not automatically fill the growth list. X and Reddit are not integrated. xAI's public Hub models are tracked separately from the X social platform; its news pages remain unavailable. See [data sources and limitations](docs/data-sources.md) for details.
 
 ## Quick Start
 

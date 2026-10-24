@@ -41,6 +41,7 @@ class ArticleOut(BaseModel):
     original_url: str | None
     author: str | None
     published_at: datetime | None
+    source_updated_at: datetime | None = None
     collected_at: datetime
     status: str
     is_read: bool

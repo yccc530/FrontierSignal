@@ -15,7 +15,9 @@ test("GLM and Meta filters show real records and publisher scan status", async (
     const data = await response.json();
     expect(data.total).toBeGreaterThan(0);
     await page.goto(`/#/feed?content_type=models&publisher=${publisher}`);
-    await expect(page.getByLabel("模型发布团队")).toHaveValue(publisher);
+    await expect(
+      page.locator(`input[name="facet-publisher"][value="${publisher}"]`),
+    ).toBeChecked();
     await expect(page.getByTestId("article-row")).toHaveCount(
       Math.min(data.total, 20),
     );
@@ -158,7 +160,9 @@ test("real model filters, metadata, references and source scope persist", async 
       "/#/feed?content_type=models&source=hf-models&topic=coding_models",
     );
     await expect(page.getByLabel("资讯内容类型")).toHaveValue("models");
-    await expect(page.getByLabel("资讯技术主题")).toHaveValue("coding_models");
+    await expect(
+      page.locator('input[name="facet-topic"][value="coding_models"]'),
+    ).toBeChecked();
     const row = page.getByTestId("article-row").first();
     await expect(row.locator(".article-title")).toHaveText(
       model.title_zh || model.title,
@@ -178,7 +182,8 @@ test("real model filters, metadata, references and source scope persist", async 
       animations: "disabled",
     });
     await page.keyboard.press("Escape");
-    await page.getByLabel("模型发布团队").selectOption("qwen");
+    await page.getByRole("tab", { name: /发布团队/ }).click();
+    await page.locator('input[name="facet-publisher"][value="qwen"]').click();
     await expect(page).toHaveURL(/publisher=qwen/);
     const qwen = await (
       await request.get(
@@ -188,7 +193,7 @@ test("real model filters, metadata, references and source scope persist", async 
     await expect(page.getByTestId("article-row")).toHaveCount(
       Math.min(qwen.total, 20),
     );
-    await page.getByLabel("资讯技术主题").selectOption("");
+    await page.getByRole("button", { name: "清除技术方向" }).click();
     const publisherModels = await (
       await request.get(
         "/api/articles?content_type=models&source=hf-models&publisher=qwen&technical=true",
@@ -295,7 +300,9 @@ test("creative model topics expose real task metadata and quoted specifications 
       expect(model).toBeTruthy();
       query.set("q", model.title);
       await page.goto(`/#/feed?${query}`);
-      await expect(page.getByLabel("资讯技术主题")).toHaveValue(topic);
+      await expect(
+        page.locator(`input[name="facet-topic"][value="${topic}"]`),
+      ).toBeChecked();
       changed.push({ id: model.id, is_read: model.is_read });
       await page
         .getByRole("button", {

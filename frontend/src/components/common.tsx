@@ -37,6 +37,7 @@ const sourceNames: Record<string, string> = {
 export const sourceLabel = (name: string) => sourceNames[name] || name;
 export const kindNames: Record<string, string> = {
   rss: "订阅源",
+  official: "官方发布",
   arxiv: "论文订阅",
   github: "项目发布",
   hackernews: "科技社区",

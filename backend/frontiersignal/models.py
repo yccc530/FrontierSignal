@@ -89,6 +89,7 @@ class Article(Base):
     canonical_url: Mapped[str | None] = mapped_column(Text)
     author: Mapped[str | None] = mapped_column(Text)
     published_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    source_updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     collected_at: Mapped[datetime] = mapped_column(UTCDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=now)
     content_hash: Mapped[str] = mapped_column(String(64))

@@ -9,6 +9,7 @@ dependencies = [
   "alembic>=1.14,<2", "apscheduler>=3.11,<4", "feedparser>=6.0.12,<7",
   "aiohttp>=3.12,<4", "httpx>=0.28,<1", "beautifulsoup4>=4.13,<5",
   "simhash==2.1.2", "pgvector>=0.4,<1", "platformdirs>=4,<5",
+  "protego>=0.4,<1",
 ]
 
 [dependency-groups]
