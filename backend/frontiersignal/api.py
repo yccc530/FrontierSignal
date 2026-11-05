@@ -4,6 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy import Text, cast, func, select, text
 
+from .backfill import BackfillRequest, backfill_plan
 from .collectors import COLLECTORS
 from .models import AnalysisAttempt, Article, ArticleLink, RawRecord, Source, TaskRun
 from .publishers import PUBLISHERS
@@ -42,6 +43,28 @@ async def sources(request: Request):
 async def collect(source_id: str, request: Request, publisher: str | None = None):
     try:
         return await request.app.state.tasks.submit(source_id, publisher)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/sources/{source_id}/backfill/preview")
+async def preview_backfill(source_id: str, value: BackfillRequest, request: Request):
+    async with request.app.state.db.sessions() as session:
+        source = await session.get(Source, source_id)
+        if not source:
+            raise HTTPException(404, "Source not found")
+        try:
+            return backfill_plan(source, value)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/sources/{source_id}/backfill", response_model=TaskOut, status_code=202)
+async def backfill_source(source_id: str, value: BackfillRequest, request: Request):
+    try:
+        return await request.app.state.tasks.submit(source_id, backfill=value)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from None
     except ValueError as exc:

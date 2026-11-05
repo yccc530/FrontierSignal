@@ -83,7 +83,12 @@ async def store_repository(session, article: Article, observation: dict):
     repository.size_kb = int(payload.get("size", 0))
     repository.archived = bool(payload.get("archived"))
     repository.tracked = (
-        article.technical_eligible and not repository.archived and not payload.get("fork", False)
+        (
+            article.technical_eligible
+            or (article.metrics.get("infrastructure") or {}).get("kind") == "fixed"
+        )
+        and not repository.archived
+        and not payload.get("fork", False)
     )
     for field in ("created_at", "pushed_at", "updated_at"):
         setattr(repository, field, parse_time(payload.get(field)))

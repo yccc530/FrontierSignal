@@ -165,6 +165,21 @@ IntersectionObserver 对至少一半进入视口的卡片提交展示指纹。�
 解析失败保持未知，不覆盖 `published_at`。采集时标准化为 UTC；时间筛选与排序共用
 `published_at → source_updated_at → collected_at`，最近收录单独按 `collected_at`。
 
+## 有界补采与常用项目
+
+迁移 `d6b2a7019f44` 仅新增可空 `task_runs.details`，旧任务保持未知审计数据。
+`backfill.py` 校验有限 UTC 日期、已接入主题与分页，每页先产出结果，任务层复用原始入库并逐条提交；
+不推进日常来源游标，也不把已执行分页作为完整窗口。`network.py` 在共享客户端中串行限制 arXiv API，重试同样至少相隔三秒。
+`metrics.analysis_deferred_hash` 将新增 / 更新的补采版本排除于自动分析；显式单条重试释放，真正新正文与原指纹不同则恢复原队列规则。
+
+`github_catalog.py` 保存固定仓库、别名与逐账号官网身份依据；成熟 / 组织查询共享总查询预算，固定轮换共享跟踪预算。
+Repo / Releases ETag 缓存在来源游标内，固定项优先，64 条 / 约 2 MB 上限；304 使用旧表示，不生成假版本或旧 Stars 时间点。
+`discovery_budget.py` 校验至少一组增长查询，独立保存 `workbench_state`，启动和后续任务读取同一预算，不按 Token 自动升级。
+常用项目标记保存在既有指标 JSON，独立累计排序；仅常用通道候选不进入增长榜。官网身份不改变模型判断或技术质量分。
+
+`coverage_audit.py` 按来源聚合七天任务、UTC 活动缺口和查询证据，补采记录独立展示，不把缺口“修复”为完整覆盖；明细超限显式截断。
+接口在现有 `/api` 下增量提供，七个导航及旧 API 保留，桌面操作与边界见 [补采指南](discovery-coverage.md)。
+
 ## 历史迁移兼容性
 
 采集流量统计已于 2026-10-24 移除。已发布迁移 `a291c7e84f60` 保留，

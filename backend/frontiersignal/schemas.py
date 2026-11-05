@@ -86,3 +86,4 @@ class TaskOut(BaseModel):
     filtered: int
     failed: int
     error: str | None
+    details: dict | None = None

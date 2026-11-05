@@ -26,6 +26,7 @@ def create_app(config: Settings = settings, db: Database | None = None):
     async def lifespan(app):
         try:
             await manager.start()
+            app.state.settings = manager.settings
             async with database.sessions() as session:
                 await seed_sources(session)
                 await seed_categories(session)

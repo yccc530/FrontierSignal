@@ -66,6 +66,14 @@ npm --prefix frontend run build
 `tests/test_network.py` 还覆盖 GitHub 限流冷却、搜索 / 仓库额度隔离、凭据隔离、到期恢复、
 `Retry-After` 和无效重置时间；使用可控响应与时钟，不消耗真实 API 额度。
 
+`tests/test_bounded_discovery.py` 覆盖 UTC 日期、有限分页与失败页续采、逐页原始保留、去重、补采 `partial`、
+自动分析排除、共享 arXiv 三秒门、固定仓库 ETag / 缓存边界、独立常用排序、显式预算与覆盖空态。
+`BoundedDiscovery.test.tsx` 检查预览与提交范围一致、修改范围后重新预览、预算草稿不自动保存，以及无覆盖不能被补采状态掩盖。
+桌面验证须检查常用项目累计依据、增长榜隔离、来源覆盖和预算；不点击真实补采 / 采集按钮来测试普通页面布局。
+
+真实补采须先预览并显式 `--apply`，根据 [补采指南](discovery-coverage.md) 限定来源、日期和页数；失败、部分成功及窗口外返回项如实记录。
+不要用离线夹具代替真实窗口，补采也不能倒填停机期间的 Stars。
+
 ## GitHub Actions
 
 配置文件为 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)，工作流名称为 `CI`。
@@ -106,6 +114,16 @@ npm --prefix frontend run test:e2e -- discovery.spec.ts
 ```
 
 测试读取实际 API，部分用例会修改并恢复收藏、已读、偏好、来源或设置。它们不是只读检查，空库可能不满足用例前提。只保留桌面测试，默认视口为 1440 × 1000；失败截图与追踪在被忽略的测试输出目录。
+
+有界补采与常用项目可定向运行：
+
+```text
+npm --prefix frontend run test:e2e -- coverage.spec.ts
+```
+
+该文件在 1024 / 1440px 读取实际常用项目与审计，检查累计指标、日期、排序、未知扫描和只读预览。
+需要已收录的 ComfyUI、llama.cpp、diffusers，以及有尚未扫描查询组的本机数据；不适用于空库 CI。
+不点击真实补采或保存预算；表单修改后刷新应恢复已存值，检查没有采集 / 模型 / 配置写入请求及页面脚本错误。
 
 已读态与指标布局修改可以只运行以下桌面回归：
 

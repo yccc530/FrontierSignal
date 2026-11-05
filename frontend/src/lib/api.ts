@@ -121,6 +121,87 @@ export type TaskRun = {
   filtered: number;
   failed: number;
   error: string | null;
+  details?: {
+    request: BackfillRequest;
+    plan: BackfillPlan;
+    pages: {
+      group: string;
+      page: number;
+      candidates: number;
+      filtered: number;
+      status: string;
+    }[];
+  } | null;
+};
+export type BackfillRequest = {
+  start_date: string;
+  end_date: string;
+  max_pages: number;
+  start_page?: number;
+  per_page: number;
+  github_date_field: "created" | "pushed" | "both";
+};
+export type BackfillPlan = {
+  bounded: boolean;
+  timezone: string;
+  start_date: string;
+  end_date: string;
+  groups: { id: string; label: string }[];
+  max_requests: number;
+  max_candidates: number;
+};
+export type CoverageAudit = {
+  activity_truncated: boolean;
+  coverage_basis: string;
+  sources: {
+    source_id: string;
+    name: string;
+    kind: string;
+    enabled: boolean;
+    last_success_at: string | null;
+    hours_since_success: number | null;
+    totals_7d: {
+      tasks: number;
+      added: number;
+      updated: number;
+      duplicates: number;
+      filtered: number;
+      failed: number;
+    };
+    days_without_successful_collection: string[] | null;
+    backfill: { supported: boolean; kind: string };
+    gaps: string[];
+    groups: {
+      id: string;
+      label: string;
+      last_scan_at: string | null;
+      candidates: number | null;
+      filtered: number | null;
+      error: string | null;
+      gaps: string[];
+    }[];
+  }[];
+  backfills: {
+    id: string;
+    source_id: string;
+    status: string;
+    added: number;
+    duplicates: number;
+    failed: number;
+    details: TaskRun["details"];
+  }[];
+};
+export type DiscoveryBudget = {
+  github_queries_per_run: number;
+  github_candidates_per_query: number;
+  github_track_per_run: number;
+  github_code_checks: number;
+  github_readme_checks: number;
+  github_history_checks: number;
+  github_search_pages: number;
+  github_mature_queries: number;
+  github_organization_queries: number;
+  github_fixed_per_run: number;
 };
 export type ArticleMetrics = {
   publisher_id?: string;
@@ -305,6 +386,19 @@ export type Project = {
   reasons: string[];
   is_read: boolean;
   is_favorite: boolean;
+  infrastructure?: {
+    kind: string;
+    label: string;
+    basis: string;
+    evidence_url?: string;
+  } | null;
+  official_organization?: {
+    label: string;
+    evidence_url: string;
+    verified_at: string;
+    basis: string;
+  } | null;
+  discovery_channels?: string[];
 };
 export type Recommendation = {
   article: Article;

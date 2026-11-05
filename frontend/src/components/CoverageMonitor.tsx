@@ -7,6 +7,7 @@ import {
   type RuntimeReport,
 } from "../lib/api";
 import { ErrorNotice } from "./common";
+import SourceCoverageAudit from "./SourceCoverageAudit";
 
 export default function CoverageMonitor() {
   const coverage = useQuery({
@@ -129,6 +130,7 @@ export default function CoverageMonitor() {
           </tbody>
         </table>
       </div>
+      <SourceCoverageAudit />
     </details>
   );
 }

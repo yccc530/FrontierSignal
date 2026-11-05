@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Sparkles,
   Library,
+  Blocks,
 } from "lucide-react";
 import { api, type Project, type Topic } from "../lib/api";
 import { useAction, useSources } from "../lib/hooks";
@@ -30,7 +31,14 @@ export default function Projects() {
   const sources = useSources();
   const page = Math.max(1, Number(params.get("page")) || 1);
   const pool = params.get("pool") || "rising";
+  const sort =
+    pool === "infrastructure"
+      ? params.get("sort") === "updated"
+        ? "updated"
+        : "stars"
+      : params.get("sort") || "recommended";
   const query = new URLSearchParams(params);
+  if (pool === "infrastructure") query.set("sort", sort);
   query.set("page", String(page));
   query.set("page_size", "12");
   const projects = useQuery({
@@ -76,7 +84,9 @@ export default function Projects() {
               ? "已观测到增长异动"
               : pool === "new"
                 ? "近 30 天创建"
-                : "全部跟踪记录"}
+                : pool === "infrastructure"
+                  ? "累计指标，不代表近期增长"
+                  : "全部跟踪记录"}
           </p>
         </div>
         <button
@@ -105,6 +115,7 @@ export default function Projects() {
         {[
           { id: "rising", label: "增长异动", icon: TrendingUp },
           { id: "new", label: "新项目", icon: Sparkles },
+          { id: "infrastructure", label: "常用基础设施", icon: Blocks },
           { id: "all", label: "全部项目", icon: Library },
         ].map(({ id, label, icon: Icon }) => (
           <button
@@ -146,12 +157,16 @@ export default function Projects() {
         </select>
         <select
           aria-label="项目排序"
-          value={params.get("sort") || "recommended"}
+          value={sort}
           onChange={(event) => change("sort", event.target.value)}
         >
-          <option value="recommended">增长动量优先</option>
-          <option value="growth24">约 24h Stars 净增</option>
-          <option value="growth7">约 7d Stars 净增</option>
+          {pool !== "infrastructure" && (
+            <>
+              <option value="recommended">增长动量优先</option>
+              <option value="growth24">约 24h Stars 净增</option>
+              <option value="growth7">约 7d Stars 净增</option>
+            </>
+          )}
           <option value="stars">累计 Stars</option>
           <option value="updated">最近代码更新</option>
         </select>
@@ -167,6 +182,7 @@ export default function Projects() {
               topics={topics.data || []}
               onOpen={open}
               onHistory={setHistory}
+              infrastructureView={pool === "infrastructure"}
             />
           ))}
         </div>

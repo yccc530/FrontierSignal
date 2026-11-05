@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Sparkles,
   Star,
+  Blocks,
   TrendingUp,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -100,11 +101,13 @@ export function ProjectItem({
   topics,
   onOpen,
   onHistory,
+  infrastructureView = false,
 }: {
   project: Project;
   topics: Topic[];
   onOpen: (id: string) => void;
   onHistory: (project: Project) => void;
+  infrastructureView?: boolean;
 }) {
   const patch = useAction("PATCH");
   const { momentum } = project;
@@ -154,14 +157,28 @@ export function ProjectItem({
         </Tooltip>
       </div>
       <div className="momentum-meta">
-        <span className={`momentum-state momentum-${momentum.status}`}>
-          <MomentumIcon size={14} aria-hidden="true" />
-          {label}
-        </span>
-        {momentum.acceleration !== null && (
-          <span>速度 {momentum.acceleration.toFixed(2)} 倍</span>
+        {infrastructureView ? (
+          <span className="momentum-state momentum-watching">
+            <Blocks size={14} />
+            常用基础设施
+          </span>
+        ) : (
+          <>
+            <span className={`momentum-state momentum-${momentum.status}`}>
+              <MomentumIcon size={14} aria-hidden="true" />
+              {label}
+            </span>
+            {momentum.acceleration !== null && (
+              <span>速度 {momentum.acceleration.toFixed(2)} 倍</span>
+            )}
+            {momentum.is_new && <span>创建 {momentum.age_days} 天</span>}
+          </>
         )}
-        {momentum.is_new && <span>创建 {momentum.age_days} 天</span>}
+        {project.official_organization && (
+          <span title={project.official_organization.basis}>
+            官方组织 · {project.official_organization.label}
+          </span>
+        )}
       </div>
       <p className="project-description">
         {project.summary_zh || project.description || "项目未提供简介"}
@@ -176,40 +193,74 @@ export function ProjectItem({
           <span className="language-tag">{project.language}</span>
         )}
       </div>
-      <dl className="project-numbers">
-        <div
-          className="project-metric-primary"
-          title={
-            signal
-              ? `${dateTime(signal.start_at)} 至 ${dateTime(signal.end_at)}`
-              : "暂无有效增长证据"
-          }
-        >
-          <dt>{signal?.label || "短期增长"}</dt>
-          <dd className={signal && signal.value > 0 ? "growth-positive" : ""}>
-            {signal ? (
-              `${signal.value > 0 ? "+" : ""}${signal.value.toLocaleString()}`
-            ) : (
-              <span className="unknown-growth">待观测</span>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt title="观测窗口内每小时平均 Stars 变化">平均 / 小时</dt>
-          <dd>
-            {signal ? (
-              signal.rate_per_hour.toFixed(2)
-            ) : (
-              <span className="unknown-growth">未知</span>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>
-            <Star size={14} /> 累计 Stars
-          </dt>
-          <dd>{project.stars.toLocaleString()}</dd>
-        </div>
+      <dl
+        className={`project-numbers${infrastructureView ? " project-numbers-infrastructure" : ""}`}
+      >
+        {infrastructureView ? (
+          <>
+            <div>
+              <dt>
+                <Star size={14} />
+                累计 Stars
+              </dt>
+              <dd>{project.stars.toLocaleString()}</dd>
+            </div>
+            <div>
+              <dt>最近代码维护</dt>
+              <dd className="project-maintenance">
+                {project.pushed_at
+                  ? new Date(project.pushed_at).toLocaleDateString("zh-CN")
+                  : "未知"}
+              </dd>
+            </div>
+            <div>
+              <dt>许可证声明</dt>
+              <dd className="project-maintenance">
+                {project.license && project.license !== "NOASSERTION"
+                  ? project.license
+                  : "未知"}
+              </dd>
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              className="project-metric-primary"
+              title={
+                signal
+                  ? `${dateTime(signal.start_at)} 至 ${dateTime(signal.end_at)}`
+                  : "暂无有效增长证据"
+              }
+            >
+              <dt>{signal?.label || "短期增长"}</dt>
+              <dd
+                className={signal && signal.value > 0 ? "growth-positive" : ""}
+              >
+                {signal ? (
+                  `${signal.value > 0 ? "+" : ""}${signal.value.toLocaleString()}`
+                ) : (
+                  <span className="unknown-growth">待观测</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt title="观测窗口内每小时平均 Stars 变化">平均 / 小时</dt>
+              <dd>
+                {signal ? (
+                  signal.rate_per_hour.toFixed(2)
+                ) : (
+                  <span className="unknown-growth">未知</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <Star size={14} /> 累计 Stars
+              </dt>
+              <dd>{project.stars.toLocaleString()}</dd>
+            </div>
+          </>
+        )}
       </dl>
       {project.reasons.length > 0 && (
         <p className="project-reason-preview">
@@ -219,8 +270,25 @@ export function ProjectItem({
       )}
       <details className="recommendation-reasons">
         <summary>
-          增长依据 · {project.recommendation_score.toFixed(0)} 分
+          {infrastructureView
+            ? "收录与维护依据"
+            : `增长依据 · ${project.recommendation_score.toFixed(0)} 分`}
         </summary>
+        {infrastructureView && (
+          <p>累计指标，不代表近期增长；维护者登记不等于独立质量认证。</p>
+        )}
+        {project.official_organization && (
+          <p>
+            <a
+              target="_blank"
+              rel="noreferrer"
+              href={project.official_organization.evidence_url}
+            >
+              官方账号身份依据
+            </a>{" "}
+            · 核验于 {project.official_organization.verified_at}
+          </p>
+        )}
         <ul>
           {project.reasons.map((reason) => (
             <li key={reason}>{reason}</li>

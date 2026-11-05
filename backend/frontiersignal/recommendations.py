@@ -38,6 +38,12 @@ def project_view(repository, article, snapshots, at, interests):
     growth24 = star_growth(snapshots, at, 1)
     growth7 = star_growth(snapshots, at, 7)
     momentum = project_momentum(repository, article, snapshots, at, interests)
+    infrastructure = article.metrics.get("infrastructure")
+    channels = article.metrics.get("discovery_channels", [])
+    if infrastructure and not {"growth", "legacy"}.intersection(channels):
+        momentum["is_rising"] = False
+        momentum["score"] = 0
+        momentum["status"] = "new" if momentum["is_new"] else "watching"
     match = bool(set(article.technical_topics) & set(interests))
     reasons = momentum["reasons"] + list(article.technical_reasons[:2])
     if repository.has_code:
@@ -74,6 +80,10 @@ def project_view(repository, article, snapshots, at, interests):
         "reasons": reasons,
         "is_read": article.is_read,
         "is_favorite": article.is_favorite,
+        "infrastructure": infrastructure,
+        "official_organization": article.metrics.get("official_organization"),
+        "discovery_channels": channels,
+        "technical_eligible": article.technical_eligible,
     }
 
 
@@ -82,8 +92,10 @@ async def ranked_projects(session, at, interests, topic=None, q=""):
         select(Repository, Article)
         .join(Article, Repository.article_id == Article.id)
         .where(
-            Article.technical_eligible.is_(True),
-            Article.status != "filtered",
+            or_(
+                Article.technical_eligible.is_(True) & (Article.status != "filtered"),
+                Article.metrics["infrastructure"]["kind"].as_string() == "fixed",
+            ),
             Repository.archived.is_(False),
             Repository.tracked.is_(True),
         )

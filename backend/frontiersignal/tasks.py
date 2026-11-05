@@ -6,13 +6,15 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select, text, update
 
 from .analysis import AnalysisPipeline
+from .backfill import BackfillRequest, backfill_pages, backfill_plan
 from .collectors import COLLECTORS
 from .collectors.github_discovery import GitHubDiscoveryCollector
 from .collectors.huggingface import HuggingFaceCollector
 from .config import Settings
 from .db import Database
+from .discovery_budget import load_discovery_budget
 from .discovery_state import record_outcome
-from .models import AnalysisAttempt, Article, Repository, Source, TaskRun, now
+from .models import AnalysisAttempt, Article, Source, TaskRun, now
 from .network import Fetcher
 from .observability import record_runtime_sample
 from .projects import tracking_targets
@@ -35,6 +37,8 @@ class TaskManager:
         self.analysis_running = False
 
     async def start(self):
+        self.settings = await load_discovery_budget(self.db, self.settings)
+        self.fetcher.settings = self.settings
         if self.db.engine.dialect.name == "postgresql":
             self.owner = await self.db.engine.connect()
             owns = await self.owner.scalar(text("SELECT pg_try_advisory_lock(761849321)"))
@@ -127,12 +131,21 @@ class TaskManager:
                 not source.last_run_at
                 or source.last_run_at + timedelta(minutes=source.interval_minutes) <= now()
             ):
-                await self.submit(source.id)
+                try:
+                    await self.submit(source.id)
+                except ValueError:
+                    # One source's backfill/disabled state cannot stop other due sources.
+                    continue
         if self.settings.llm_configured and not self.analysis_running:
             if await AnalysisPipeline(self.db, self.settings).pending_ids():
                 await self.submit_analysis()
 
-    async def submit(self, source_id: str, publisher: str | None = None) -> TaskRun:
+    async def submit(
+        self,
+        source_id: str,
+        publisher: str | None = None,
+        backfill: BackfillRequest | None = None,
+    ) -> TaskRun:
         async with self.lock:
             await self.ensure_owner()
             if self.closing:
@@ -145,6 +158,7 @@ class TaskManager:
                     raise ValueError("Source is disabled")
                 if source.kind not in COLLECTORS:
                     raise ValueError("该平台当前未接入，不创建采集任务")
+                plan = backfill_plan(source, backfill) if backfill else None
                 if publisher:
                     from .publishers import PUBLISHERS, publisher_authors
 
@@ -157,21 +171,87 @@ class TaskManager:
                 existing = await session.scalar(
                     select(TaskRun).where(
                         TaskRun.source_id == source_id,
-                        TaskRun.kind == "collect",
+                        TaskRun.kind.in_(["collect", "backfill"]),
                         TaskRun.status.in_(["queued", "running"]),
                     )
                 )
                 if existing:
-                    if publisher:
-                        raise ValueError("模型来源已有任务运行，请结束后再采集指定团队")
+                    if publisher or backfill or existing.kind == "backfill":
+                        raise ValueError("该来源已有采集或补采任务，请结束后再提交")
                     return existing
-                run = TaskRun(source_id=source_id)
+                run = TaskRun(
+                    source_id=source_id,
+                    kind="backfill" if backfill else "collect",
+                    details={"request": backfill.model_dump(mode="json"), "plan": plan, "pages": []}
+                    if backfill
+                    else None,
+                )
                 session.add(run)
                 await session.commit()
-                worker = asyncio.create_task(self._run(run.id, source_id, publisher))
+                worker = asyncio.create_task(
+                    self._backfill(run.id, source_id, backfill)
+                    if backfill
+                    else self._run(run.id, source_id, publisher)
+                )
                 self.workers.add(worker)
                 worker.add_done_callback(self.workers.discard)
                 return run
+
+    async def _backfill(self, run_id, source_id, request):
+        try:
+            async with self.semaphore, asyncio.timeout(self.settings.task_timeout):
+                async with self.db.sessions() as session:
+                    run = await session.get(TaskRun, run_id)
+                    source = await session.get(Source, source_id)
+                    if not source.enabled:
+                        raise ValueError("Source disabled before execution")
+                    run.status, run.started_at = "running", now()
+                    await session.commit()
+                    errors = []
+                    async for collection, page in backfill_pages(self.fetcher, source, request):
+                        page.update(added=0, updated=0, duplicates=0, filtered=0, failed=0)
+                        for item in collection.items:
+                            try:
+                                async with session.begin_nested():
+                                    article, outcome = await ingest(session, source, item)
+                                    if outcome != "duplicates":
+                                        await link_related(session, article)
+                                setattr(run, outcome, getattr(run, outcome) + 1)
+                                page[outcome] += 1
+                                if not article.technical_eligible:
+                                    run.filtered += 1
+                                    page["filtered"] += 1
+                            except Exception as exc:
+                                run.failed += 1
+                                page["failed"] += 1
+                                errors.append(f"补采条目入库失败（{type(exc).__name__}）")
+                            await session.commit()
+                        errors.extend(collection.errors)
+                        run.failed += len(collection.errors)
+                        page["failed"] += len(collection.errors)
+                        page["errors"] = collection.errors
+                        run.details = {**run.details, "pages": [*run.details["pages"], page]}
+                        await session.commit()
+                    run.status = (
+                        "failed"
+                        if run.failed and not (run.added + run.updated + run.duplicates)
+                        else "partial"
+                    )
+                    run.error = "; ".join(errors[:5]) or None
+                    run.finished_at = now()
+                    await session.commit()
+        except asyncio.CancelledError:
+            await self._fail(
+                run_id, source_id, "interrupted", "Application stopped during bounded backfill"
+            )
+            raise
+        except Exception as exc:
+            message = (
+                "Bounded backfill exceeded the configured task timeout"
+                if isinstance(exc, TimeoutError)
+                else f"有界补采中止（{type(exc).__name__}）"
+            )
+            await self._fail(run_id, source_id, "failed", message)
 
     async def _run(self, run_id: str, source_id: str, publisher: str | None = None):
         try:
@@ -217,10 +297,6 @@ class TaskManager:
                         collector.targets = await tracking_targets(
                             session, self.settings.github_track_per_run
                         )
-                        for target in collector.targets:
-                            tracked = await session.get(Repository, target["id"])
-                            tracked.last_tracked_at = now()
-                        await session.commit()
                     collection = await collector.collect(source)
                     run.filtered = collection.filtered
                     errors = list(collection.errors)
@@ -236,6 +312,11 @@ class TaskManager:
                             )
                             if outcome in {"added", "updated"} and not article.technical_eligible:
                                 run.filtered += 1
+                                record_outcome(
+                                    collection.cursor,
+                                    item.metrics.get("discovery_groups", []),
+                                    "filtered",
+                                )
                         except Exception as exc:
                             run.failed += 1
                             if source.kind == "official":
@@ -284,7 +365,8 @@ class TaskManager:
             source = await session.get(Source, source_id)
             run.status, run.error, run.finished_at = status, message, now()
             run.failed += 1
-            source.last_status, source.last_error, source.last_run_at = status, message, now()
+            if run.kind != "backfill":
+                source.last_status, source.last_error, source.last_run_at = status, message, now()
             await session.commit()
 
     async def submit_analysis(self, article_id=None):
@@ -309,6 +391,11 @@ class TaskManager:
                     if article.status in {"analyzed", "filtered"}:
                         raise ValueError("该内容已完成处理，不重复调用模型")
                     article.retry_at, article.analysis_attempts = None, 0
+                    article.metrics = {
+                        key: value
+                        for key, value in article.metrics.items()
+                        if key != "analysis_deferred_hash"
+                    }
                 run = TaskRun(kind="analyze")
                 session.add(run)
                 await session.commit()

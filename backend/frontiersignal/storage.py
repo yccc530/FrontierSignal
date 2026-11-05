@@ -4,6 +4,7 @@ import json
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .citations import arxiv_id
 from .content_info import content_metadata
 from .models import Article, RawRecord, Source, now
 from .normalizer import RawItem, digest, normalize
@@ -16,6 +17,19 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
     conditions = [Article.identity_key == values["identity_key"]]
     if values["canonical_url"]:
         conditions.append(Article.canonical_url == values["canonical_url"])
+    paper_id = arxiv_id(item.url) or arxiv_id(item.platform_id) if source.kind == "arxiv" else None
+    if paper_id:
+        item.metrics["arxiv_id"] = paper_id
+        conditions.append(Article.metrics["arxiv_id"].as_string() == paper_id)
+        # Match legacy RSS rows before arxiv_id metadata existed, including URL/version changes.
+        for scheme in ("http", "https"):
+            base = f"{scheme}://arxiv.org/abs/{paper_id}"
+            conditions.extend(
+                [
+                    Article.canonical_url == base,
+                    Article.canonical_url.startswith(base + "v", autoescape=True),
+                ]
+            )
     if len(values["body"]) >= 80 and source.kind not in {"hackernews", "hf_models", "hf_datasets"}:
         conditions.append(Article.content_hash == values["content_hash"])
     article = await session.scalar(
@@ -50,6 +64,27 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
             if values[key] is not None and getattr(article, key) != values[key]:
                 setattr(article, key, values[key])
     if item.metrics:
+        if source.kind == "github_discovery":
+            previous_metrics = article.metrics or {}
+            previous_channels = previous_metrics.get("discovery_channels")
+            if (
+                previous_channels is None
+                and previous_metrics.get("kind") == "repository"
+                and not previous_metrics.get("infrastructure")
+                and not previous_metrics.get("backfill")
+            ):
+                # Preserve the old discovery candidacy; real growth is still evaluated separately.
+                previous_channels = ["legacy"]
+            item.metrics["discovery_channels"] = list(
+                dict.fromkeys(
+                    [
+                        *(previous_channels or []),
+                        *item.metrics.get("discovery_channels", []),
+                    ]
+                )
+            )
+            if not item.metrics.get("infrastructure") and previous_metrics.get("infrastructure"):
+                item.metrics["infrastructure"] = previous_metrics["infrastructure"]
         if source.kind == "github_discovery" and item.preserve_existing_content:
             item.metrics["resource"] = {
                 **(article.metrics or {}).get("resource", {}),
@@ -105,6 +140,8 @@ async def ingest(session: AsyncSession, source: Source, item: RawItem) -> tuple[
     )
     article.technical_score, article.technical_topics = signal.score, signal.topics
     article.technical_reasons, article.technical_eligible = signal.reasons, signal.eligible
+    if item.defer_analysis and outcome != "duplicates":
+        article.metrics = {**article.metrics, "analysis_deferred_hash": article.content_hash}
     if item.repository:
         await store_repository(session, article, item.repository)
     payload = item.raw or {

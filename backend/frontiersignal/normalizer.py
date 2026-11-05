@@ -59,6 +59,7 @@ class RawItem:
     repository: dict | None = None
     identity_url: str | None = None
     preserve_existing_content: bool = False
+    defer_analysis: bool = False
 
 
 def normalize(item: RawItem) -> dict:

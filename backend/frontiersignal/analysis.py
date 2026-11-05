@@ -45,6 +45,11 @@ class AnalysisPipeline:
                                 (Article.status == "failed") & (Article.analysis_attempts < 3),
                             ),
                             or_(Article.retry_at.is_(None), Article.retry_at <= now()),
+                            or_(
+                                Article.metrics["analysis_deferred_hash"].as_string().is_(None),
+                                Article.metrics["analysis_deferred_hash"].as_string()
+                                != Article.content_hash,
+                            ),
                         )
                         .order_by(
                             case(

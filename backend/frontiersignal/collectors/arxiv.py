@@ -50,6 +50,7 @@ class ArxivCollector(RSSCollector):
                 items = await asyncio.to_thread(
                     parse_entries, data, self.fetcher.settings.max_items
                 )
+                filtered = 0
                 for item in items:
                     if "api/errors" in (item.platform_id or ""):
                         raise ValueError("arXiv API 返回查询错误")
@@ -57,6 +58,7 @@ class ArxivCollector(RSSCollector):
                     signal = technical_signal(item.title, text, "arxiv", item.metrics)
                     if key not in signal.topics or not signal.eligible:
                         result.filtered += 1
+                        filtered += 1
                         continue
                     if item.platform_id in seen:
                         continue
@@ -64,7 +66,14 @@ class ArxivCollector(RSSCollector):
                     item.metrics["query_topics"] = [key]
                     item.metrics["discovery_groups"] = [key]
                     result.items.append(item)
-                record_scan(scans, key, label=CATALOG[key].label, topics=[key], count=len(items))
+                record_scan(
+                    scans,
+                    key,
+                    label=CATALOG[key].label,
+                    topics=[key],
+                    count=len(items),
+                    filtered=filtered,
+                )
             except Exception as exc:
                 error = f"arXiv {CATALOG[key].label}查询失败（{type(exc).__name__}）"
                 result.errors.append(error)

@@ -82,6 +82,11 @@ The publisher catalog also includes Kimi, MiniMax, StepFun, Baidu, Intern, Hunyu
 
 GitHub rankings are derived from official API data and recorded observations; they are not GitHub Trending rankings. Growth remains unknown until sufficient history exists, and high lifetime star counts do not automatically fill the growth list. X and Reddit are not integrated. xAI's public Hub models are tracked separately from the X social platform; its news pages remain unavailable. See [data sources and limitations](docs/data-sources.md) for details.
 
+The separate **Common infrastructure (常用基础设施)** view includes mature projects and a controlled catalog; lifetime stars never enter growth rankings. Settings expose search, tracking, and official-organization budgets.
+Source coverage provides bounded date-window backfills for arXiv and GitHub plus a seven-day activity audit. Ordinary RSS cannot restore history, and backfilled content is deferred from automatic analysis.
+The catalog contains 17 repositories and 10 GitHub accounts verified through official website links. New channels require an explicit budget; identity verification is not a quality certification.
+See [discovery coverage and backfills](docs/discovery-coverage.md) for operations and limits. Bounded results do not promise full recovery of an offline period.
+
 ## Quick Start
 
 ### 1. Prerequisites

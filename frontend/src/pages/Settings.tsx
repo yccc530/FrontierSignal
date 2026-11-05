@@ -4,6 +4,7 @@ import { type LLMConfig, type SystemSettings } from "../lib/api";
 import { useAction, useCategories, useSettings, useStats } from "../lib/hooks";
 import { Empty, ErrorNotice } from "../components/common";
 import { Switch } from "../components/ui/switch";
+import DiscoveryBudget from "../components/DiscoveryBudget";
 
 function editable(value: SystemSettings): LLMConfig {
   return {
@@ -59,6 +60,9 @@ export default function Settings() {
       )}
       <div className="settings-layout content-band">
         <div>
+          <DiscoveryBudget
+            tokenConfigured={query.data?.github_token_configured ?? false}
+          />
           <section className="settings-section">
             <div className="section-label">
               模型服务<span>OpenAI 兼容接口</span>

@@ -84,6 +84,8 @@ class Fetcher:
         self.settings = settings
         self.hosts = DEFAULT_HOSTS | set(settings.extra_feed_hosts)
         self._github_cooldowns: dict[tuple[str, str], tuple[float, str, int]] = {}
+        self._arxiv_lock = asyncio.Lock()
+        self._arxiv_last_request = float("-inf")
 
     def _github_identity(self, headers: dict) -> str:
         authorization = next(
@@ -165,6 +167,18 @@ class Fetcher:
         raise AssertionError("unreachable")
 
     async def _request(self, url: str, headers: dict) -> tuple[bytes, dict, int]:
+        parsed = urlsplit(url)
+        if parsed.hostname == "export.arxiv.org" and parsed.path == "/api/query":
+            # Serialize normal queries, backfill pages and retries through one client.
+            async with self._arxiv_lock:
+                delay = 3 - (time.monotonic() - self._arxiv_last_request)
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                self._arxiv_last_request = time.monotonic()
+                return await self._perform_request(url, headers)
+        return await self._perform_request(url, headers)
+
+    async def _perform_request(self, url: str, headers: dict) -> tuple[bytes, dict, int]:
         proxy = self.settings.outbound_proxy.get_secret_value() or None
         resolver = PublicResolver()
         connector = aiohttp.TCPConnector(resolver=None if proxy else resolver, ttl_dns_cache=30)

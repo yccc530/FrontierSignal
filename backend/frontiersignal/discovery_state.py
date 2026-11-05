@@ -3,7 +3,7 @@
 from .models import now
 
 
-def record_scan(scans, key, *, label, topics, count=0, error=None, partial=False):
+def record_scan(scans, key, *, label, topics, count=0, error=None, partial=False, filtered=None):
     previous = scans.get(key, {})
     at = now().isoformat()
     scans[key] = {
@@ -18,6 +18,7 @@ def record_scan(scans, key, *, label, topics, count=0, error=None, partial=False
         "updated": 0,
         "duplicates": 0,
         "failed": 0,
+        "filtered": filtered,
     }
 
 
@@ -25,6 +26,8 @@ def record_outcome(cursor, groups, outcome):
     for key in groups:
         row = cursor.get("scans", {}).get(key)
         if row is not None:
+            if outcome == "filtered" and row.get("filtered") is None:
+                continue
             row[outcome] = (row.get(outcome) or 0) + 1
 
 

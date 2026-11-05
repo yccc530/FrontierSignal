@@ -13,8 +13,10 @@
 | 研究偏好                             | `.env`                      | 页面保存后生效           |
 | 来源启停、频率、专项范围             | PostgreSQL                  | 页面保存后生效           |
 | 推荐份额、收藏、已读、展示记录       | PostgreSQL                  | 页面操作后生效           |
+| GitHub 发现预算                      | PostgreSQL 的工作台状态     | 设置页保存后下轮任务生效 |
 
-进程环境变量优先于 `.env`。若某个设置由进程环境变量管理，网页修改会被拒绝，需要修改启动环境。列表配置使用 JSON，例如 `FS_EXTRA_FEED_HOSTS=["example.org"]`。
+启动配置中，进程环境变量优先于 `.env`。模型服务与研究偏好若由进程环境变量管理，网页修改会被拒绝，需要修改启动环境。
+GitHub 发现预算单独保存在数据库中，优先规则见下文。列表配置使用 JSON，例如 `FS_EXTRA_FEED_HOSTS=["example.org"]`。
 
 `.env`、`.runtime/` 和 `backups/` 已被 Git 忽略。不要把真实密钥写进 README、Issue、命令截图或提交内容。
 
@@ -92,21 +94,30 @@ GitHub 搜索与仓库查询使用不同额度。收到带额度重置时间或 
 冷却结束后由下一次定时或手动采集重试，不会在恢复时刻额外创建任务。
 重启会清除本地冷却记录，但不会恢复 GitHub 的服务端额度；不要通过反复重启或点击采集重试限流。
 
-| 变量                             | 默认值 | 每轮作用                     |
-| -------------------------------- | ------ | ---------------------------- |
-| `FS_GITHUB_QUERIES_PER_RUN`      | `2`    | 项目发现查询组数，1–4        |
-| `FS_GITHUB_CANDIDATES_PER_QUERY` | `10`   | 每组候选数，1–30             |
-| `FS_GITHUB_TRACK_PER_RUN`        | `10`   | 已发现仓库跟踪名额，1–15     |
-| `FS_GITHUB_CODE_CHECKS`          | `3`    | 代码目录检查预算，0–10       |
-| `FS_GITHUB_README_CHECKS`        | `2`    | README 读取预算，0–5         |
-| `FS_GITHUB_HISTORY_CHECKS`       | `8`    | 官方获星历史请求预算，0–15   |
-| `FS_HN_CANDIDATES`               | `60`   | Hacker News 候选预算，10–150 |
-| `FS_HN_COMMENT_LIMIT`            | `3`    | 每个采样帖子顶层评论数，0–10 |
-| `FS_HF_QUERIES_PER_RUN`          | `6`    | 模型查询名额，1–6            |
-| `FS_HF_CANDIDATES_PER_QUERY`     | `5`    | 每次模型查询候选数，1–10     |
-| `FS_HF_CARD_CHECKS`              | `6`    | 模型卡读取预算，0–15         |
+| 变量                             | 默认值 | 每轮作用                           |
+| -------------------------------- | ------ | ---------------------------------- |
+| `FS_GITHUB_QUERIES_PER_RUN`      | `2`    | 项目发现查询组数，1–4              |
+| `FS_GITHUB_CANDIDATES_PER_QUERY` | `10`   | 每组候选数，1–30                   |
+| `FS_GITHUB_TRACK_PER_RUN`        | `10`   | 已发现仓库跟踪名额，1–15           |
+| `FS_GITHUB_CODE_CHECKS`          | `3`    | 代码目录检查预算，0–10             |
+| `FS_GITHUB_README_CHECKS`        | `2`    | README 读取预算，0–5               |
+| `FS_GITHUB_HISTORY_CHECKS`       | `8`    | 官方获星历史请求预算，0–15         |
+| `FS_GITHUB_SEARCH_PAGES`         | `3`    | 轮换页数上限，1–5                  |
+| `FS_GITHUB_MATURE_QUERIES`       | `0`    | 成熟项目组数，包含在总查询数内     |
+| `FS_GITHUB_ORGANIZATION_QUERIES` | `0`    | 官网核验组织组数，包含在总查询数内 |
+| `FS_GITHUB_FIXED_PER_RUN`        | `0`    | 固定仓库名额，包含在总跟踪数内     |
+| `FS_HN_CANDIDATES`               | `60`   | Hacker News 候选预算，10–150       |
+| `FS_HN_COMMENT_LIMIT`            | `3`    | 每个采样帖子顶层评论数，0–10       |
+| `FS_HF_QUERIES_PER_RUN`          | `6`    | 模型查询名额，1–6                  |
+| `FS_HF_CANDIDATES_PER_QUERY`     | `5`    | 每次模型查询候选数，1–10           |
+| `FS_HF_CARD_CHECKS`              | `6`    | 模型卡读取预算，0–15               |
 
 预算限制单次任务的工作量，采集间隔在「信息来源」中设置。增加预算会提高请求数和耗时，无法绕过上游配额。没有必要为了“全方向覆盖”同时提高所有参数。
+
+新增 GitHub 通道默认关闭，不因 Token 存在自动提高预算。设置页可填入 Token 建议值：总查询 4 组 × 20 候选、总跟踪 15 个、获星历史 15 个、轮换最多 5 页；成熟和官网组织各占 1 组，固定仓库占 3 个跟踪名额，普通增长仍保留 2 组。
+该建议默认最多 54 次逻辑调用，重试与跳转另计；填表后仍须保存才生效，至少给普通增长保留一组。
+`FS_GITHUB_*` 是初始配置；页面保存后，`workbench_state` 中的独立预算优先，重启继续读取，不改写私有 `.env`、密钥或来源主题范围。
+采集任务运行期间修改预算返回 409，等待该批结束再保存。固定列表、身份及回补边界见 [发现覆盖与补采](discovery-coverage.md)。
 
 GLM / Meta 优先查询使用已有 HF 名额，不增加上述默认值。默认两轮检查三个官方账号；
 拉长来源间隔、缩小预算或限定主题会改变实际检查周期，查看来源页的估计与最近扫描时间。

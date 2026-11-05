@@ -12,8 +12,11 @@ from sqlalchemy import select
 from .collectors.arxiv import research_groups
 from .collectors.huggingface import dataset_groups, model_groups, model_query
 from .config import PROJECT_ROOT
+from .coverage_audit import coverage_audit
+from .discovery_budget import DiscoveryBudget, public_budget
 from .discovery_state import scan_rows
-from .models import Repository, Source, StarSnapshot, WorkbenchState, now
+from .github_catalog import FIXED_REPOSITORIES, ORGANIZATIONS, public_github_catalog
+from .models import Repository, Source, StarSnapshot, TaskRun, WorkbenchState, now
 from .observability import runtime_report
 from .publishers import public_publishers
 from .recommendation_state import RecommendationPolicy, load_policy, record_views
@@ -55,6 +58,23 @@ async def discovery_coverage(request: Request):
                 else research_groups(source)
             )
             config = request.app.state.settings
+            if source.kind == "github_discovery":
+                if config.github_mature_queries:
+                    groups.append({"id": "infrastructure", "label": "常用基础设施", "topics": []})
+                if config.github_organization_queries:
+                    groups.extend(
+                        {
+                            "id": f"organization:{login}",
+                            "label": f"官方组织 · {label}",
+                            "topics": [],
+                        }
+                        for login, label, _ in ORGANIZATIONS
+                    )
+                if config.github_fixed_per_run:
+                    groups.extend(
+                        {"id": f"fixed:{name}", "label": f"固定跟踪 · {name}", "topics": []}
+                        for name, _, _ in FIXED_REPOSITORIES
+                    )
             priority_rounds = None
             if source.kind == "hf_models":
                 remaining = {group["id"] for group in groups}
@@ -77,12 +97,31 @@ async def discovery_coverage(request: Request):
             else:
                 per_run = (
                     config.github_queries_per_run
+                    - config.github_mature_queries
+                    - config.github_organization_queries
                     if source.kind == "github_discovery"
                     else 3
                     if source.kind == "hf_datasets"
                     else 2
                 )
-                rounds = math.ceil(len(groups) / per_run)
+                rounds = math.ceil(
+                    (
+                        len(source.discovery_topics)
+                        if source.kind == "github_discovery"
+                        else len(groups)
+                    )
+                    / per_run
+                )
+                if source.kind == "github_discovery":
+                    rounds = max(
+                        rounds,
+                        math.ceil(len(ORGANIZATIONS) / config.github_organization_queries)
+                        if config.github_organization_queries
+                        else 0,
+                        math.ceil(len(FIXED_REPOSITORIES) / config.github_fixed_per_run)
+                        if config.github_fixed_per_run
+                        else 0,
+                    )
                 request_budget = (
                     (
                         config.github_queries_per_run
@@ -115,6 +154,46 @@ async def discovery_coverage(request: Request):
 async def runtime(request: Request):
     async with request.app.state.db.sessions() as session:
         return await runtime_report(session, request.app.state.settings, now())
+
+
+@router.get("/discovery/audit")
+async def audit(request: Request):
+    async with request.app.state.db.sessions() as session:
+        return await coverage_audit(session, now(), request.app.state.settings)
+
+
+@router.get("/discovery/github-catalog")
+async def github_catalog():
+    return public_github_catalog()
+
+
+@router.get("/discovery/budget")
+async def discovery_budget(request: Request):
+    return public_budget(request.app.state.settings)
+
+
+@router.patch("/discovery/budget")
+async def save_discovery_budget(value: DiscoveryBudget, request: Request):
+    manager = request.app.state.tasks
+    async with manager.lock, request.app.state.db.sessions() as session:
+        active = await session.scalar(
+            select(TaskRun.id)
+            .where(
+                TaskRun.kind.in_(["collect", "backfill"]), TaskRun.status.in_(["queued", "running"])
+            )
+            .limit(1)
+        )
+        if active:
+            raise HTTPException(409, "采集或补采任务运行时不能修改发现预算")
+        stored = await session.get(WorkbenchState, "discovery-budget")
+        if stored:
+            stored.value = value.model_dump()
+        else:
+            session.add(WorkbenchState(id="discovery-budget", value=value.model_dump()))
+        await session.commit()
+        config = request.app.state.settings.model_copy(update=value.model_dump())
+        request.app.state.settings = manager.settings = manager.fetcher.settings = config
+        return public_budget(config)
 
 
 @router.get("/recommendation-policy")
@@ -178,7 +257,7 @@ async def projects(
     request: Request,
     q: str = Query("", max_length=200),
     topic: str | None = None,
-    pool: Literal["rising", "new", "all"] = "rising",
+    pool: Literal["rising", "new", "infrastructure", "all"] = "rising",
     sort: Literal["recommended", "stars", "growth24", "growth7", "updated"] = "recommended",
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -192,11 +271,29 @@ async def projects(
             "all": len(items),
             "rising": sum(row["momentum"]["is_rising"] for row in items),
             "new": sum(row["momentum"]["is_new"] for row in items),
+            "infrastructure": sum(bool(row["infrastructure"]) for row in items),
         }
-        if pool != "all":
+        if pool == "infrastructure":
+            items = [row for row in items if row["infrastructure"]]
+            items.sort(
+                key=lambda row: (
+                    -row["stars"],
+                    -(row["pushed_at"].timestamp() if row["pushed_at"] else 0),
+                    row["id"],
+                )
+            )
+            for row in items:
+                row["recommendation_score"] = 0
+                row["momentum"] = {**row["momentum"], "score": 0}
+                row["reasons"] = [
+                    row["infrastructure"]["basis"],
+                    "累计指标，不代表近期增长",
+                    *row["reasons"],
+                ]
+        elif pool != "all":
             field = "is_rising" if pool == "rising" else "is_new"
             items = [row for row in items if row["momentum"][field]]
-        if sort in {"growth24", "growth7"}:
+        if pool != "infrastructure" and sort in {"growth24", "growth7"}:
             field = "growth_24h" if sort == "growth24" else "growth_7d"
             items.sort(
                 key=lambda row: (

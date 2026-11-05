@@ -51,7 +51,7 @@ export default function Tasks() {
             <option value="active">运行中 / 排队</option>
             <option value="success">成功</option>
             <option value="failed">失败</option>
-            <option value="partial">部分失败</option>
+            <option value="partial">部分成功 / 有界补采</option>
             <option value="interrupted">中断</option>
           </select>
         </div>
@@ -84,15 +84,22 @@ export default function Tasks() {
                           ? "AI 情报分析"
                           : task.kind === "probe"
                             ? "模型接口验证"
-                            : sourceLabel(
+                            : `${task.kind === "backfill" ? "有界补采 · " : ""}${sourceLabel(
                                 sources.data?.find(
                                   (s) => s.id === task.source_id,
                                 )?.name ||
                                   task.source_id ||
                                   "未知来源",
-                              )}
+                              )}`}
                       </strong>
                       <small className="task-id">{task.id.slice(0, 8)}</small>
+                      {task.kind === "backfill" && task.details && (
+                        <small className="task-id">
+                          {task.details.plan.start_date} 至{" "}
+                          {task.details.plan.end_date} UTC · 最多{" "}
+                          {task.details.plan.max_requests} 次查询 · 非全量
+                        </small>
+                      )}
                       {task.error && (
                         <p className="source-error">
                           {displayError(task.error)}
@@ -100,7 +107,13 @@ export default function Tasks() {
                       )}
                     </td>
                     <td>
-                      <Status value={task.status} />
+                      {task.kind === "backfill" &&
+                      task.status === "partial" &&
+                      task.failed === 0 ? (
+                        <span className="muted">有界补采</span>
+                      ) : (
+                        <Status value={task.status} />
+                      )}
                     </td>
                     {[
                       task.added,
@@ -130,11 +143,18 @@ export default function Tasks() {
                     </td>
                     <td>
                       {task.source_id &&
+                        (task.kind !== "backfill" ||
+                          task.failed > 0 ||
+                          task.status === "interrupted") &&
                         ["failed", "partial", "interrupted"].includes(
                           task.status,
                         ) && (
                           <IconButton
-                            label="重试采集"
+                            label={
+                              task.kind === "backfill"
+                                ? "重试有界补采"
+                                : "重试采集"
+                            }
                             disabled={
                               retry.isPending ||
                               !sources.data?.find(
@@ -143,7 +163,11 @@ export default function Tasks() {
                             }
                             onClick={() =>
                               retry.mutate({
-                                path: `/sources/${task.source_id}/collect`,
+                                path: `/sources/${task.source_id}/${task.kind === "backfill" ? "backfill" : "collect"}`,
+                                body:
+                                  task.kind === "backfill"
+                                    ? task.details?.request
+                                    : undefined,
                               })
                             }
                           >

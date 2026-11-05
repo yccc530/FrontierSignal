@@ -749,6 +749,73 @@
 .coverage-runtime {
   padding: var(--space-3) 0;
 }
+.source-coverage-audit {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.source-coverage-audit h2 {
+  font-size: 20px;
+}
+.source-coverage-audit td {
+  min-width: 150px;
+  overflow-wrap: anywhere;
+}
+.source-coverage-audit small,
+.catalog-list small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+.audit-query {
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.backfill-control,
+.catalog-details {
+  margin-block: var(--space-4);
+}
+.backfill-control .form-stack {
+  max-width: 900px;
+}
+.backfill-control .form-columns,
+.discovery-budget .form-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: end;
+}
+.discovery-budget .section-label {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+.discovery-budget .section-label > span {
+  margin-left: auto;
+}
+.catalog-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+}
+.catalog-list a {
+  min-height: var(--icon-button-size);
+  overflow-wrap: anywhere;
+}
+.project-numbers dd.project-maintenance {
+  font-size: 16px;
+  line-height: 24px;
+  min-height: 29px;
+  overflow-wrap: anywhere;
+}
+.project-numbers-infrastructure {
+  grid-template-columns:
+    minmax(max-content, 1.2fr) minmax(max-content, 1.15fr)
+    minmax(0, 1fr);
+}
+.project-numbers-infrastructure > div:is(:first-child, :nth-child(2)) dd {
+  white-space: nowrap;
+}
 .coverage-panel .table-scroll {
   max-height: 480px;
   overflow: auto;
