@@ -63,6 +63,9 @@ npm --prefix frontend run build
 
 可以按受影响文件缩小 pytest 范围。测试覆盖标准化、URL、精确去重、数据库交互、模型失败重试、任务状态、推荐窗口与核心前端交互。
 
+`tests/test_network.py` 还覆盖 GitHub 限流冷却、搜索 / 仓库额度隔离、凭据隔离、到期恢复、
+`Retry-After` 和无效重置时间；使用可控响应与时钟，不消耗真实 API 额度。
+
 ## GitHub Actions
 
 配置文件为 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)，工作流名称为 `CI`。

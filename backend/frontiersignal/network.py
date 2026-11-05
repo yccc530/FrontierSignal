@@ -1,7 +1,9 @@
 import asyncio
+import hashlib
 import ipaddress
 import json
 import math
+import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -57,9 +59,10 @@ class PublicResolver(aiohttp.resolver.ThreadedResolver):
 
 
 class FetchError(Exception):
-    def __init__(self, message, status=None, delay=0.0):
+    def __init__(self, message, status=None, delay=0.0, *, rate_limited=False):
         super().__init__(message)
         self.status, self.delay = status, delay
+        self.rate_limited = rate_limited
 
 
 def retry_after_seconds(value: str | None) -> float:
@@ -80,16 +83,79 @@ class Fetcher:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.hosts = DEFAULT_HOSTS | set(settings.extra_feed_hosts)
+        self._github_cooldowns: dict[tuple[str, str], tuple[float, str, int]] = {}
+
+    def _github_identity(self, headers: dict) -> str:
+        authorization = next(
+            (value for key, value in headers.items() if key.lower() == "authorization"), ""
+        )
+        return hashlib.sha256(authorization.encode()).hexdigest()
+
+    def _check_github_cooldown(self, url: str, headers: dict) -> None:
+        parsed = urlsplit(url)
+        if parsed.hostname != "api.github.com":
+            return
+        resource = "search" if parsed.path.startswith("/search/") else "core"
+        identity = self._github_identity(headers)
+        for bucket in ("all", resource):
+            key = (identity, bucket)
+            cooldown = self._github_cooldowns.get(key)
+            if cooldown is None:
+                continue
+            until, message, status = cooldown
+            delay = until - time.monotonic()
+            if delay > 0:
+                raise FetchError(message, status, delay, rate_limited=True)
+            del self._github_cooldowns[key]
+
+    def _response_error(self, url: str, headers: dict, status: int, response_headers) -> FetchError:
+        delay = retry_after_seconds(response_headers.get("Retry-After"))
+        message = f"HTTP {status}; source refused or unavailable"
+        if urlsplit(url).hostname == "api.github.com" and status in {403, 429}:
+            resource = response_headers.get("X-RateLimit-Resource")
+            primary = response_headers.get("X-RateLimit-Remaining") == "0"
+            if primary:
+                try:
+                    reset = float(response_headers.get("X-RateLimit-Reset", ""))
+                    if math.isfinite(reset):
+                        delay = max(delay, reset - time.time())
+                except (ValueError, TypeError):
+                    pass
+            if delay > 0:
+                try:
+                    reset_at = datetime.fromtimestamp(time.time() + delay, UTC).isoformat()
+                except (OverflowError, OSError, ValueError):
+                    return FetchError(message, status, delay)
+                # Secondary limits may apply across resources; primary quotas are separate.
+                bucket = resource if primary and resource in {"core", "search"} else "all"
+                scope = {"core": "仓库查询", "search": "项目搜索", "all": "请求"}[bucket]
+                message = (
+                    f"GitHub {scope}额度受限（HTTP {status}）；预计 {reset_at} 恢复（UTC）；"
+                    "恢复前暂停相同额度的请求，可配置自己的只读 FS_GITHUB_TOKEN 或降低采集频率"
+                )
+                self._github_cooldowns[(self._github_identity(headers), bucket)] = (
+                    time.monotonic() + delay,
+                    message,
+                    status,
+                )
+                return FetchError(message, status, delay, rate_limited=True)
+        return FetchError(message, status, delay)
 
     async def get(self, url: str, headers: dict | None = None) -> tuple[bytes, dict, int]:
         # The connector connects to addresses returned by this resolver. A second
         # uncontrolled DNS lookup cannot redirect a validated host to loopback.
         validate_feed_url(url, self.hosts)
         for attempt in range(3):
+            self._check_github_cooldown(url, headers or {})
             try:
                 return await self._request(url, headers or {})
             except FetchError as exc:
-                if attempt == 2 or exc.status not in {429, 500, 502, 503, 504} or exc.delay > 60:
+                if (
+                    exc.rate_limited
+                    or attempt == 2
+                    or exc.status not in {429, 500, 502, 503, 504}
+                    or exc.delay > 60
+                ):
                     raise
                 await asyncio.sleep(max(exc.delay, 0.5 * 2**attempt))
             except (aiohttp.ClientError, TimeoutError) as exc:
@@ -138,11 +204,7 @@ class Fetcher:
                     if r.status == 304:
                         return b"", dict(r.headers), 304
                     if r.status != 200:
-                        raise FetchError(
-                            f"HTTP {r.status}; source refused or unavailable",
-                            r.status,
-                            retry_after_seconds(r.headers.get("Retry-After")),
-                        )
+                        raise self._response_error(url, request_headers, r.status, r.headers)
                     chunks, size = [], 0
                     async for chunk in r.content.iter_chunked(65536):
                         size += len(chunk)

@@ -71,6 +71,8 @@ def github_headers(settings):
 
 
 def error_message(exc, stage):
+    if isinstance(exc, FetchError) and exc.rate_limited:
+        return f"GitHub {stage}未完成：{exc}"
     if isinstance(exc, FetchError) and exc.status in {403, 429}:
         return f"GitHub {stage}达到访问限制或缺少权限；可配置只读 Token 或等待额度恢复"
     return f"GitHub {stage}失败（{type(exc).__name__}）；其他已获取项目仍会保存"
