@@ -4,7 +4,7 @@ export default defineConfig({
   workers: 1,
   timeout: 30000,
   use: {
-    baseURL: "http://127.0.0.1:8000",
+    baseURL: process.env.FS_E2E_BASE_URL || "http://127.0.0.1:8000",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
+from .chinese_summaries import ChineseSummaryPolicy, summary_coverage, summary_ready
 from .config import PROJECT_ROOT, Settings
-from .models import Category
+from .models import AnalysisAttempt, Article, Category, TaskRun, WorkbenchState, now
 
 router = APIRouter(prefix="/api")
 
@@ -43,6 +44,66 @@ def public_settings(config):
 @router.get("/settings")
 async def read_settings(request: Request):
     return public_settings(request.app.state.settings)
+
+
+@router.get("/chinese-summaries")
+async def chinese_summaries(request: Request):
+    async with request.app.state.db.sessions() as session:
+        return await summary_coverage(session, request.app.state.settings)
+
+
+@router.patch("/chinese-summaries")
+async def save_chinese_summaries(value: ChineseSummaryPolicy, request: Request):
+    async with request.app.state.tasks.lock, request.app.state.db.sessions() as session:
+        row = await session.get(WorkbenchState, "chinese-summaries")
+        if row:
+            row.value = value.model_dump()
+        else:
+            session.add(WorkbenchState(id="chinese-summaries", value=value.model_dump()))
+        await session.commit()
+        return await summary_coverage(session, request.app.state.settings)
+
+
+class SummaryRetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    limit: int = Field(default=30, ge=1, le=100)
+
+
+@router.post("/chinese-summaries/retry")
+async def retry_chinese_summaries(value: SummaryRetry, request: Request):
+    async with request.app.state.tasks.lock, request.app.state.db.sessions() as session:
+        running = (
+            select(AnalysisAttempt.id)
+            .where(AnalysisAttempt.article_id == Article.id, AnalysisAttempt.status == "running")
+            .exists()
+        )
+        rows = (
+            await session.scalars(
+                select(Article)
+                .where(
+                    ~summary_ready(),
+                    Article.analysis_attempts >= 3,
+                    Article.status != "processing",
+                    ~running,
+                )
+                .order_by(
+                    Article.technical_eligible.desc(), Article.collected_at.desc(), Article.id
+                )
+                .limit(value.limit)
+            )
+        ).all()
+        for article in rows:
+            article.analysis_attempts, article.retry_at, article.analysis_error = 0, None, None
+        run = TaskRun(
+            kind="summary_retry",
+            status="success",
+            updated=len(rows),
+            started_at=now(),
+            finished_at=now(),
+        )
+        session.add(run)
+        await session.commit()
+        return {"queued": len(rows), "limit": value.limit, "task_id": run.id}
 
 
 @router.patch("/settings")

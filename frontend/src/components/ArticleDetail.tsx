@@ -10,6 +10,7 @@ import {
 import ModelFacts from "./ModelFacts";
 import ContentFacts from "./ContentFacts";
 import { displayError } from "../lib/messages";
+import { summaryText } from "../lib/chineseSummary";
 import { useAction, useCategories, useSettings } from "../lib/hooks";
 import { Metrics } from "./Intelligence";
 import {
@@ -252,7 +253,9 @@ export default function ArticleDetail({
                 </section>
               )}
               {!article.summary_zh && (
-                <p className="muted">中文解读尚未生成。</p>
+                <p className="muted">
+                  {summaryText(null, article.status, article.analysis_error)}
+                </p>
               )}
               <details className="detail-section" key={article.id}>
                 <summary>查看原始标题与正文</summary>

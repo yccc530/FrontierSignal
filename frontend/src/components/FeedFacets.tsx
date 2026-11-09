@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import type { Category, Publisher, Topic } from "../lib/api";
 import { IconButton } from "./common";
@@ -28,10 +28,30 @@ export default function FeedFacets({
       ? "publisher"
       : params.get("topic")
         ? "topic"
-        : "publisher",
+        : params.get("category")
+          ? "category"
+          : "publisher",
   );
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(
+    params.has("publisher") || params.has("topic") || params.has("category"),
+  );
   const [search, setSearch] = useState("");
+  const publisher = params.get("publisher");
+  const topic = params.get("topic");
+  const category = params.get("category");
+  const previous = useRef({ publisher, topic, category });
+  useEffect(() => {
+    const current = { publisher, topic, category };
+    const changed = (Object.keys(labels) as Facet[]).find(
+      (key) => current[key] && current[key] !== previous.current[key],
+    );
+    if (changed) {
+      setTab(changed);
+      setOpen(true);
+      setSearch("");
+    }
+    previous.current = current;
+  }, [publisher, topic, category]);
   const catalogs = {
     publisher: publishers,
     topic: topics,

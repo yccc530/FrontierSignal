@@ -216,13 +216,13 @@ test("settings preserve configuration and report save or active-task rejection",
   expect(submitted).not.toHaveProperty("llm_api_key");
   expect(settings).toMatchObject(submitted);
   if (response.status() === 409) {
-    // The live scheduler may be analyzing while this read/write UI check runs.
-    expect(await response.json()).toEqual({
-      detail: "分析任务运行时不能修改模型配置",
-    });
-    await expect(page.getByRole("alert")).toHaveText(
+    // The live scheduler may be analyzing, or this run may override config via process env.
+    const detail = (await response.json()).detail;
+    expect([
       "分析任务运行时不能修改模型配置",
-    );
+      "配置受进程环境变量管理，请在启动环境修改",
+    ]).toContain(detail);
+    await expect(page.getByRole("alert")).toHaveText(detail);
     await expect(page.getByRole("status")).toHaveCount(0);
   } else {
     expect(response.status()).toBe(200);

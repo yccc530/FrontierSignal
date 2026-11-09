@@ -88,6 +88,20 @@ export type LLMConfig = {
   llm_json_mode: boolean;
   embedding_model: string;
 };
+export type SummaryCoverage = {
+  policy: { all_content: boolean };
+  automatic: boolean;
+  batch_size: number;
+  total: number;
+  ready: number;
+  queued: number;
+  processing: number;
+  retrying: number;
+  failed: number;
+  deferred: number;
+  excluded: number;
+  last_success_at: string | null;
+};
 export type SystemSettings = LLMConfig & {
   llm_key_configured: boolean;
   llm_configured: boolean;
@@ -341,6 +355,8 @@ export type Project = {
   name: string;
   description: string | null;
   summary_zh: string | null;
+  analysis_status?: string;
+  analysis_error?: string | null;
   url: string;
   language: string | null;
   license: string | null;

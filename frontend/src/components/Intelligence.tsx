@@ -20,6 +20,7 @@ import {
   type Topic,
 } from "../lib/api";
 import { useAction } from "../lib/hooks";
+import { summaryText } from "../lib/chineseSummary";
 import { Empty, ErrorNotice, IconButton, ReadIndicator } from "./common";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
@@ -181,7 +182,11 @@ export function ProjectItem({
         )}
       </div>
       <p className="project-description">
-        {project.summary_zh || project.description || "项目未提供简介"}
+        {summaryText(
+          project.summary_zh,
+          project.analysis_status,
+          project.analysis_error,
+        )}
       </p>
       <div className="technical-tags">
         {project.topics.slice(0, 3).map((id) => (

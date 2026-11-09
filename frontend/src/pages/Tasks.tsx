@@ -82,15 +82,17 @@ export default function Tasks() {
                       <strong>
                         {task.kind === "analyze"
                           ? "AI 情报分析"
-                          : task.kind === "probe"
-                            ? "模型接口验证"
-                            : `${task.kind === "backfill" ? "有界补采 · " : ""}${sourceLabel(
-                                sources.data?.find(
-                                  (s) => s.id === task.source_id,
-                                )?.name ||
-                                  task.source_id ||
-                                  "未知来源",
-                              )}`}
+                          : task.kind === "summary_retry"
+                            ? "中文摘要失败重排队"
+                            : task.kind === "probe"
+                              ? "模型接口验证"
+                              : `${task.kind === "backfill" ? "有界补采 · " : ""}${sourceLabel(
+                                  sources.data?.find(
+                                    (s) => s.id === task.source_id,
+                                  )?.name ||
+                                    task.source_id ||
+                                    "未知来源",
+                                )}`}
                       </strong>
                       <small className="task-id">{task.id.slice(0, 8)}</small>
                       {task.kind === "backfill" && task.details && (

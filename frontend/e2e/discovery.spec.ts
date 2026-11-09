@@ -126,14 +126,34 @@ test("real recommendations separate observed momentum from new project candidate
   await expect(
     page.getByRole("heading", { name: "技术推荐", exact: true }),
   ).toBeVisible();
-  for (const title of [
-    "短期增长异动",
-    "新项目观察",
-    "今日 AI 技术热点",
-    "最新前沿论文",
-    "官方模型与技术发布",
-    "高价值技术发现",
-  ])
+  for (const label of ["讨论", "论文", "官方", "发现"])
+    await expect(
+      page.getByRole("tab", { name: new RegExp(`^${label}`) }),
+    ).toBeVisible();
+  const ids = await page
+    .locator(".featured-list > [data-article-id]")
+    .evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("data-article-id")),
+    );
+  expect(ids.length).toBeGreaterThan(0);
+  expect(ids.length).toBeLessThanOrEqual(12);
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(ids).toContain(
+    (data.projects[0] || data.emerging_projects[0]).article_id,
+  );
+  await page.screenshot({
+    path: `../.runtime/${info.project.name}-recommendations.png`,
+    animations: "disabled",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.getByRole("tab", { name: /^项目/ }).click();
+  await expect(page).toHaveURL(/tab=projects/);
+  for (const title of ["短期增长异动", "新项目观察"])
     await expect(
       page.getByRole("heading", { name: title, exact: true }),
     ).toBeVisible();
@@ -150,23 +170,10 @@ test("real recommendations separate observed momentum from new project candidate
   await first.getByText(/增长依据/).click();
   await expect(first).toContainText(firstProject.reasons[0]);
   await first.getByText(/增长依据/).click();
-  const ids = await page
-    .getByTestId("recommendation-item")
-    .evaluateAll((elements) =>
-      elements.map((element) => element.getAttribute("data-article-id")),
-    );
-  expect(new Set(ids).size).toBe(ids.length);
-  await page.screenshot({
-    path: `../.runtime/${info.project.name}-recommendations.png`,
-    animations: "disabled",
-    fullPage: true,
-  });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBeTruthy();
-  await page.getByLabel("推荐技术主题").selectOption("inference");
+  await page
+    .getByRole("navigation", { name: "技术方向" })
+    .getByRole("link", { name: "推理优化", exact: true })
+    .click();
   await expect(page).toHaveURL(/topic=inference/);
   const filtered = await (
     await request.get("/api/recommendations?topic=inference")

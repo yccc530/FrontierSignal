@@ -45,9 +45,10 @@ async function checkReadability(page: Page) {
   const result = await page.evaluate(() => {
     const selectors = {
       h1: 28,
-      ".project-name, .article-title, .recommend-title": 17,
-      ".project-description, .article-preview, .recommend-summary": 15,
-      ".nav-label, .page-heading p, .eyebrow, .muted, .recommend-meta, .article-meta, .technical-tags span, .project-footer > span, .project-numbers dt, .project-reason-preview, .data-table th, .source-cell small, .source-url, .task-id, .status-list dt, .status-list dd, .form-stack label, .key-status small, .interest-preview, .state-badge, .empty-state p, .error-banner, .model-tags span, .model-tags strong, .model-links a, .interest-options small, .momentum-state, .unknown-growth, .notice, .warning-tag, .evidence-text, .model-caution, .source-mark, [data-slot=tooltip-content]": 13,
+      ".summary-counts dt, .summary-counts dd, .switch-line label": 13,
+      ".project-name, .article-title, .recommend-title, .featured-title": 17,
+      ".project-description, .article-preview, .recommend-summary, .featured-summary": 15,
+      ".nav-label, .page-heading p, .eyebrow, .muted, .recommend-meta, .article-meta, .technical-tags span, .project-footer > span, .project-numbers dt, .project-reason-preview, .data-table th, .source-cell small, .source-url, .task-id, .status-list dt, .status-list dd, .form-stack label, .key-status small, .interest-preview, .state-badge, .empty-state p, .error-banner, .model-tags span, .model-tags strong, .model-links a, .interest-options small, .momentum-state, .unknown-growth, .notice, .warning-tag, .evidence-text, .model-caution, .source-mark, .section-tab, .featured-meta, .featured-category, .featured-reason, .featured-time, .featured-item > .muted, .topic-link, .topic-more, .topic-directory-groups h3, .topic-directory-options small, [data-slot=tooltip-content]": 13,
     };
     const issues: string[] = [];
     const ratios: number[] = [];
@@ -147,6 +148,23 @@ for (const width of [1024, 1440, 1920]) {
       expect(heading).toBe(true);
       await checkReadability(page);
       if (entry.route === "/") {
+        await expect(page.locator(".policy-panel")).toHaveCount(0);
+        await expect(page.getByRole("spinbutton")).toHaveCount(0);
+        await page
+          .getByRole("button", { name: "更多方向", exact: true })
+          .click();
+        const directory = page.getByRole("dialog", {
+          name: "选择技术方向",
+          exact: true,
+        });
+        await expect(directory.getByRole("link")).toHaveCount(30);
+        await checkReadability(page);
+        expect(
+          await directory.evaluate(
+            (node) => node.scrollWidth <= node.clientWidth,
+          ),
+        ).toBe(true);
+        await page.keyboard.press("Escape");
         const aligned = await page
           .locator(".recommend-heading")
           .evaluateAll((headings) =>
@@ -323,7 +341,7 @@ test("recommendations expose loading, empty and request failure states", async (
     release();
   }
   await expect(
-    page.getByRole("heading", { name: "暂未观测到明显增长" }),
+    page.getByRole("heading", { name: "当前主题暂无推荐内容" }),
   ).toBeVisible();
   await expect(page.getByTestId("project-item")).toHaveCount(0);
   await checkReadability(page);

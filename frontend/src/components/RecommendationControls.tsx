@@ -32,7 +32,7 @@ export default function RecommendationControls({
   return (
     <details className="interest-panel policy-panel">
       <summary>
-        <SlidersHorizontal size={17} /> 推荐份额
+        <SlidersHorizontal size={17} /> 高级推荐设置
       </summary>
       <ErrorNotice error={query.error || save.error} />
       {draft && (

@@ -66,6 +66,11 @@ npm --prefix frontend run build
 `tests/test_network.py` 还覆盖 GitHub 限流冷却、搜索 / 仓库额度隔离、凭据隔离、到期恢复、
 `Retry-After` 和无效重置时间；使用可控响应与时钟，不消耗真实 API 额度。
 
+`tests/test_chinese_summaries.py` 覆盖显式全量范围、默认补采暂缓、筛除资格保留、重复请求复用及原文独立保存、
+模型 / 内容 / 分类变更与无效缓存不复用、展示优先和历史名额、失败次数限制、覆盖统计和有界重排队。
+`ChineseSummaries.test.tsx` 与 `lib/chineseSummary.test.ts` 检查真实进度字段、显式开关 / 重试请求及缺摘要状态文案。
+`chinese-summaries.spec.ts` 使用浏览器夹具验证三个桌面宽度、持久化摘要显示和配置操作，不调用真实模型或写入实际策略。
+
 `tests/test_bounded_discovery.py` 覆盖 UTC 日期、有限分页与失败页续采、逐页原始保留、去重、补采 `partial`、
 自动分析排除、共享 arXiv 三秒门、固定仓库 ETag / 缓存边界、独立常用排序、显式预算与覆盖空态。
 `BoundedDiscovery.test.tsx` 检查预览与提交范围一致、修改范围后重新预览、预算草稿不自动保存，以及无覆盖不能被补采状态掩盖。
@@ -136,8 +141,43 @@ npm --prefix frontend run test:e2e -- discovery.spec.ts visual.spec.ts --grep "p
 1024、1440、1920px 的文字对比度、三列主指标、两列展开指标、数值对齐和页面溢出。
 第二批另检查标题 / 操作区对齐、表头 / 数据行 / 悬停的背景区分、图标尺寸与提示、
 键盘焦点和减少动态效果；加载、空数据与错误使用浏览器请求夹具。
+分类导航验收还需覆盖：技术推荐一次只渲染一个栏目、精选含项目与资讯且按资讯 ID 去重、不超过 12 条，
+保留栏目份额 / 栏目内顺序 / 近期未展示优先，不以来源内分数跨栏目重排；仅有项目时不能误报无推荐。
+检查 `tab` / `content_type` 刷新、浏览器前进后退、方向键循环、Home / End、焦点和标签 / 内容区关联，
+以及 1024px 标签换行而不是横向隐藏。资讯库从 Hub / HN 排序切换内容标签须清理自动来源范围，保留其他筛选；
+资讯分类面板默认收起，带发布团队 / 主题 / 分类深链或站内参数变化时恢复相应面板，允许手动收起。
+面板收起时不渲染筛选控件，测试须先点击
+「发布团队」等分类标签，再选择具体选项。
 来源页包含折叠的覆盖表格，验收应选择 `.source-table`，不要把隐藏表格当成主列表。
 推荐页正常展示仍会按现有逻辑保存展示记录，不触发手动采集或模型分析。
+
+`sections.spec.ts` 使用浏览器请求夹具验证上述导航和筛选恢复，不把夹具写入数据库；除截获的曝光请求外拒绝写入。
+`Discovery.test.tsx` 另检查 50% 可视阈值、同版本曝光去重及失败后切回栏目的重试。
+Vitest 同时发现 `.test.ts` 和 `.test.tsx`，纯精选选择测试位于 `src/lib/featured.test.ts`。
+
+分类直达另需检查：首页没有推荐份额数字表单，也不单独请求 / 写入推荐策略；方向入口来自后台主题目录，
+点击后发送对应 `topic` 查询、保留当前栏目，并显示该方向标题与结果。目录搜索空态、非首屏方向深链、
+刷新、前进 / 后退、Enter 选择、Escape 关闭及焦点恢复均需覆盖；模型资讯与项目入口保留当前方向。
+`TopicNavigation.test.tsx` 检查链接、搜索和历史恢复，`RecommendationControls.test.tsx` 只用隔离 HTTP 夹具检查高级表单默认折叠及原策略 API。
+`sections.spec.ts` 使用浏览器夹具覆盖三个桌面宽度下的直达与设置页位置，禁止真实配置写入。
+`models.spec.ts` 的策略持久化用例已改从「系统设置 → 高级推荐设置」进入，仍属于修改后恢复的真实写入测试，
+不必为普通分类导航验收运行它。
+可在独立预览端口验证构建产物，保留当前运行版本（以下是 Bash / WSL 示例，两个终端分别执行）：
+
+```bash
+# 终端一：从项目根目录构建并预览；预览的 API 仍代理到现有 8000 端口服务
+npm --prefix frontend run build -- --outDir ../.runtime/ui-preview-dist
+cd frontend
+npm exec vite preview -- --host 127.0.0.1 --port 5173 --strictPort --outDir ../.runtime/ui-preview-dist
+```
+
+```bash
+# 终端二：项目根目录；仅使用夹具的分类导航测试
+FS_E2E_BASE_URL=http://127.0.0.1:5173 npm --prefix frontend run test:e2e -- sections.spec.ts
+```
+
+`FS_E2E_BASE_URL` 仅改变 Playwright 目标地址；未设置时仍使用 `http://127.0.0.1:8000`。
+真实数据视觉用例仍要求已运行后端和本地采集记录；不需要为这些前端检查重跑采集或调用模型。
 
 ## 真实服务验证
 

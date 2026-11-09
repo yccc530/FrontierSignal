@@ -1,10 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Check, FlaskConical, KeyRound, Plus, Save } from "lucide-react";
-import { type LLMConfig, type SystemSettings } from "../lib/api";
+import {
+  api,
+  type LLMConfig,
+  type SystemSettings,
+  type Topic,
+} from "../lib/api";
 import { useAction, useCategories, useSettings, useStats } from "../lib/hooks";
 import { Empty, ErrorNotice } from "../components/common";
 import { Switch } from "../components/ui/switch";
 import DiscoveryBudget from "../components/DiscoveryBudget";
+import RecommendationControls from "../components/RecommendationControls";
+import ChineseSummaries from "../components/ChineseSummaries";
 
 function editable(value: SystemSettings): LLMConfig {
   return {
@@ -21,6 +29,10 @@ export default function Settings() {
   const query = useSettings();
   const categories = useCategories();
   const stats = useStats();
+  const topics = useQuery({
+    queryKey: ["topics"],
+    queryFn: () => api<Topic[]>("/topics"),
+  });
   const save = useAction("PATCH");
   const probe = useAction();
   const categorySave = useAction();
@@ -201,6 +213,11 @@ export default function Settings() {
               </form>
             )}
           </section>
+          <section className="settings-section">
+            <ErrorNotice error={topics.error} />
+            <RecommendationControls topics={topics.data || []} />
+          </section>
+          <ChineseSummaries />
           <section className="settings-section">
             <div className="section-label">
               情报分类<span>{categories.data?.length ?? "—"} 个</span>

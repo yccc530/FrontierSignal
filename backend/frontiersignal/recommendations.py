@@ -58,6 +58,8 @@ def project_view(repository, article, snapshots, at, interests):
         "name": repository.full_name,
         "description": repository.description,
         "summary_zh": article.summary_zh,
+        "analysis_status": article.status,
+        "analysis_error": article.analysis_error,
         "url": repository.url,
         "language": repository.language,
         "license": repository.license,

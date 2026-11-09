@@ -9,6 +9,7 @@ test("desktop publisher grid and citation sorting use real API results", async (
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/#/feed");
     const panel = page.getByRole("region", { name: "资讯分类面板" });
+    await panel.getByRole("tab", { name: /发布团队/ }).click();
     await expect(
       panel.locator('.facet-option input[type="radio"]'),
     ).toHaveCount(publishers.length);
@@ -45,7 +46,9 @@ test("desktop publisher grid and citation sorting use real API results", async (
     Math.min(records.total, 20),
   );
   await page.getByLabel("排序方式").selectOption("citations");
-  await expect(page.getByLabel("资讯内容类型")).toHaveValue("papers");
+  await expect(
+    page.getByRole("tab", { name: "论文", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   const papers = await (
     await request.get(
       "/api/articles?sort=citations&content_type=papers&technical=true",
@@ -66,5 +69,7 @@ test("desktop publisher grid and citation sorting use real API results", async (
     /^https:\/\/openalex.org\/W/,
   );
   await page.getByRole("button", { name: "收起分类面板" }).click();
-  await expect(page.getByRole("tabpanel")).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "资讯分类面板" }).getByRole("tabpanel"),
+  ).toHaveCount(0);
 });

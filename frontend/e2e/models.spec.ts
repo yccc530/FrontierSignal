@@ -31,9 +31,12 @@ test("GLM and Meta filters show real records and publisher scan status", async (
   await page.goto("/#/sources");
   const panel = page.locator(".coverage-panel");
   await panel.locator(":scope > summary").click();
-  await expect(panel.getByText("智谱 / Z.ai", { exact: true })).toBeVisible();
+  const publisherScan = panel.getByLabel("重点厂商扫描");
   await expect(
-    panel.getByText("Meta · facebook", { exact: true }),
+    publisherScan.getByText("智谱 / Z.ai", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    publisherScan.getByText("Meta · facebook", { exact: true }),
   ).toBeVisible();
 });
 
@@ -45,8 +48,8 @@ test("recommendation shares persist and coverage reports actual observation", as
     await request.get("/api/recommendation-policy")
   ).json();
   try {
-    await page.goto("/");
-    await page.getByText("推荐份额", { exact: true }).click();
+    await page.goto("/#/settings");
+    await page.getByText("高级推荐设置", { exact: true }).click();
     await page.getByLabel("模型展示条数", { exact: true }).fill("3");
     await page.getByLabel("3D 资产生成推荐份额", { exact: true }).fill("2");
     await page
@@ -56,7 +59,7 @@ test("recommendation shares persist and coverage reports actual observation", as
       "推荐设置已保存",
     );
     await page.reload();
-    await page.getByText("推荐份额", { exact: true }).click();
+    await page.getByText("高级推荐设置", { exact: true }).click();
     await expect(page.getByLabel("模型展示条数", { exact: true })).toHaveValue(
       "3",
     );
@@ -159,7 +162,9 @@ test("real model filters, metadata, references and source scope persist", async 
     await page.goto(
       "/#/feed?content_type=models&source=hf-models&topic=coding_models",
     );
-    await expect(page.getByLabel("资讯内容类型")).toHaveValue("models");
+    await expect(
+      page.getByRole("tab", { name: "模型", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
     await expect(
       page.locator('input[name="facet-topic"][value="coding_models"]'),
     ).toBeChecked();

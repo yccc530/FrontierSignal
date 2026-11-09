@@ -14,11 +14,11 @@ The application interface and AI-generated titles and summaries currently use Si
 
 ## Screenshots
 
-These screenshots were captured from the running desktop application on October 23, 2026, at 1440 × 1000. Articles and metrics come from data collected in that local installation; a fresh installation does not include them. Screenshots illustrate the main workflows, and some interface details may differ from the current version. Click an image to view it at full size.
+These screenshots were captured from the running desktop application at 1440 × 1000. Technical recommendations and model news were updated on November 5, 2026; projects, article details, and source management were captured on October 23, 2026. Articles and metrics reflect local data at each capture time; a fresh installation does not include them. Screenshots illustrate the main workflows, and some interface details may differ from the current version. Click an image to view it at full size.
 
-**Technical recommendations:** review projects with recent growth, Chinese summaries, star activity, and recommendation reasons.
+**Technical recommendations:** choose a content tab and click a technical topic, such as LLMs, AI agents, or image generation, to browse matching content. A searchable directory provides the remaining topics. The compact featured list combines projects and articles with cross-section deduplication and no comparison of source-specific popularity scores. Research preferences remain available; optional advanced recommendation parameters are in Settings, so browsing requires no numeric weights.
 
-[![Technical recommendations with research preferences, section quotas, and growing projects](docs/images/workbench.png)](docs/images/workbench.png)
+[![Technical recommendations with clickable topic links, category tabs, and a compact featured list](docs/images/workbench.png)](docs/images/workbench.png)
 
 <details>
 <summary>View projects, model news, article details, and source management</summary>
@@ -31,9 +31,9 @@ Switch between growth signals, new projects, and the complete project list. Filt
 
 ### Model News
 
-Filter by content type, technical topic, and publisher. This example shows video models with Chinese summaries, task types, and original resource links.
+Choose a content type from the tab bar, then sort or open the optional publisher, topic, and category panel. This example selects models and sorts by Hugging Face downloads; analyzed model releases show Chinese summaries, model facts, and original resource links.
 
-[![Video model news with topic filters, Chinese summaries, and source links](docs/images/models.png)](docs/images/models.png)
+[![Model news with content tabs, publisher filters, and Hugging Face download sorting](docs/images/models.png)](docs/images/models.png)
 
 ### Article Details
 
@@ -57,7 +57,7 @@ Manage enabled sources, automatic collection, and intervals. Review successful r
 | Follow models and research  | Aggregate model cards, official blogs, and papers across language, image, video, audio, 3D, robotics, and other technical topics           |
 | Read technical intelligence | Generate Chinese titles, summaries, categories, and importance scores with a configurable LLM while retaining originals and evidence links |
 | Build a research library    | Search, filter, bookmark, and track read status across recommendations, projects, and articles                                             |
-| Set research priorities     | Configure collection scope, research interests, recommendation counts, and topic allocation independently                                  |
+| Choose research topics      | Browse with topic links and content tabs; manage collection scope, research interests, and optional advanced settings separately           |
 | Inspect collection activity | Review task results, errors, source coverage, star history, and model calls                                                                |
 
 **An LLM is optional for collection, search, and reading.** Configure one to generate Chinese analysis. Failed model calls leave the original records intact and can be retried individually.
@@ -76,14 +76,14 @@ The application includes **21 source configurations, 27 publisher entries, and 3
 
 Topics include LLMs, agents, training and inference, RAG, multimodal and coding models, OCR, image/video/audio generation, 3D/CAD, world models, robotics, vibe coding, MCP/skills, development tools, and AI for science.
 
-To browse GLM or Meta, open **Articles (资讯库)**, select **Model news (模型资讯)**, and filter the publisher to **智谱 / Z.ai** or **Meta**. These accounts share the existing request budget; collection does not download model weights. Source coverage reports the latest successful scan and any collection errors for each priority account.
+To browse GLM or Meta, open **Articles (资讯库)**, select the **Models (模型)** tab, and filter the publisher to **智谱 / Z.ai** or **Meta**. These accounts share the existing request budget; collection does not download model weights. Source coverage reports the latest successful scan and any collection errors for each priority account.
 
 The publisher catalog also includes Kimi, MiniMax, StepFun, Baidu, Intern, Hunyuan, and NVIDIA model accounts. A grouped grid lets you filter teams, topics, and categories without scrolling through long dropdowns. Sort by time, importance, technical relevance, paper citations, or source-specific popularity. Citation counts come from exact arXiv lookups in OpenAlex; unavailable counts remain unknown, and observations link to their source. New papers may not yet be indexed.
 
 GitHub rankings are derived from official API data and recorded observations; they are not GitHub Trending rankings. Growth remains unknown until sufficient history exists, and high lifetime star counts do not automatically fill the growth list. X and Reddit are not integrated. xAI's public Hub models are tracked separately from the X social platform; its news pages remain unavailable. See [data sources and limitations](docs/data-sources.md) for details.
 
 The separate **Common infrastructure (常用基础设施)** view includes mature projects and a controlled catalog; lifetime stars never enter growth rankings. Settings expose search, tracking, and official-organization budgets.
-Source coverage provides bounded date-window backfills for arXiv and GitHub plus a seven-day activity audit. Ordinary RSS cannot restore history, and backfilled content is deferred from automatic analysis.
+Source coverage provides bounded date-window backfills for arXiv and GitHub plus a seven-day activity audit. Ordinary RSS cannot restore history. Backfilled content is deferred by default; all-content Chinese summaries can be enabled separately.
 The catalog contains 17 repositories and 10 GitHub accounts verified through official website links. New channels require an explicit budget; identity verification is not a quality certification.
 See [discovery coverage and backfills](docs/discovery-coverage.md) for operations and limits. Bounded results do not promise full recovery of an offline period.
 
@@ -148,6 +148,10 @@ FS_LLM_MODEL=your-model-id
 These are placeholders. Use your provider's actual settings. The base URL must not include `/chat/completions`; the application appends that path.
 
 Open **Settings (系统设置)** and select **Verify API (验证接口)**. Confirm success in **Tasks (运行任务)**, then select **Analyze pending (分析待处理)** in the article feed. When the scheduler is enabled and the LLM configuration is complete, pending articles are also analyzed automatically in batches, consuming provider usage.
+
+Chinese titles and summaries are generated in the background and persisted. Reading an article reuses those results without another model call. Full-paper translation is not implemented. Original content remains available while processing; use **More filters → Processing status → Analyzed (更多筛选 → 处理状态 → 已分析)** to browse completed articles.
+
+To summarize every record, enable **Summarize all articles (全部资讯生成中文摘要)** under **Settings → Chinese summaries (系统设置 → 中文摘要)**. This includes historical backfills and filtered records while preserving their filtering status. Completed results are skipped; identical inputs and model configurations can reuse a valid result. The panel reports actual progress and supports bounded failure retries. Enabling this option increases model usage; historical records are processed gradually.
 
 The provider adapter supports configurable OpenAI-compatible Chat Completions services. JSON mode is disabled by default because compatible gateways can support different parameters. Credentials are read from local configuration or environment variables and are not returned in full to the browser. See [configuration](docs/configuration.md) for optional OpenCode gateway import, proxies, and request budgets.
 

@@ -7,10 +7,17 @@ import {
   ArrowRight,
   ArrowUpRight,
   Bookmark,
+  Box,
   CheckCheck,
+  Code2,
+  Database,
+  FileText,
+  LayoutList,
   Search,
   SlidersHorizontal,
   Sparkles,
+  Workflow,
+  Wrench,
   X,
 } from "lucide-react";
 import {
@@ -42,7 +49,22 @@ import ArticleDetail from "../components/ArticleDetail";
 import { Metrics } from "../components/Intelligence";
 import ModelFacts from "../components/ModelFacts";
 import ContentFacts from "../components/ContentFacts";
+import { summaryText } from "../lib/chineseSummary";
 import FeedFacets from "../components/FeedFacets";
+import SectionTabs, {
+  sectionTabId,
+  type SectionTab,
+} from "../components/SectionTabs";
+
+const feedTabs: SectionTab[] = [
+  { id: "", label: "全部", icon: LayoutList },
+  { id: "models", label: "模型", icon: Box },
+  { id: "tools", label: "工具", icon: Wrench },
+  { id: "projects", label: "项目", icon: Code2 },
+  { id: "workflows", label: "工作流", icon: Workflow },
+  { id: "papers", label: "论文", icon: FileText },
+  { id: "datasets", label: "数据集", icon: Database },
+];
 
 export default function Feed({ favorite = false }: { favorite?: boolean }) {
   const [params, setParams] = useSearchParams();
@@ -94,9 +116,21 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
   });
   const change = (key: string, value: string) =>
     setParams((previous) => {
+      if (key === "content_type" && (previous.get(key) || "") === value)
+        return previous;
       const next = new URLSearchParams(previous);
       value ? next.set(key, value) : next.delete(key);
       if (key !== "page") next.delete("page");
+      if (key === "content_type") {
+        const sort = previous.get("sort") || "";
+        const source = previous.get("source");
+        if (
+          (["downloads", "likes"].includes(sort) &&
+            ["hf-models", "hf-datasets"].includes(source || "")) ||
+          (["points", "comments"].includes(sort) && source === "hackernews")
+        )
+          next.delete("source");
+      }
       if (
         ["source", "content_type", "publisher"].includes(key) &&
         ["citations", "downloads", "likes", "points", "comments"].includes(
@@ -190,6 +224,17 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
           </Link>
         </div>
       )}
+      <SectionTabs
+        label="资讯内容分类"
+        panelId="feed-content-panel"
+        items={feedTabs}
+        value={params.get("content_type") || ""}
+        onChange={(value) => {
+          change("content_type", value);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }}
+      />
       <div className="search-toolbar">
         <form className="search-field" onSubmit={submitSearch}>
           <Search size={16} />
@@ -228,32 +273,7 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
             </option>
           ))}
         </select>
-        <IconButton
-          label="更多筛选"
-          active={expanded}
-          onClick={() => setExpanded(!expanded)}
-        >
-          <SlidersHorizontal size={17} />
-        </IconButton>
-      </div>
-      <div className="model-filter-toolbar">
-        <label>
-          内容
-          <select
-            aria-label="资讯内容类型"
-            value={params.get("content_type") || ""}
-            onChange={(event) => change("content_type", event.target.value)}
-          >
-            <option value="">全部资讯</option>
-            <option value="models">模型资讯</option>
-            <option value="tools">工具与应用</option>
-            <option value="projects">项目案例</option>
-            <option value="workflows">创作工作流</option>
-            <option value="papers">研究论文</option>
-            <option value="datasets">数据集</option>
-          </select>
-        </label>
-        <label>
+        <label className="toolbar-field">
           排序
           <select
             aria-label="排序方式"
@@ -272,6 +292,13 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
             <option value="comments">HN 讨论 · 评论数</option>
           </select>
         </label>
+        <IconButton
+          label="更多筛选"
+          active={expanded}
+          onClick={() => setExpanded(!expanded)}
+        >
+          <SlidersHorizontal size={17} />
+        </IconButton>
       </div>
       <FeedFacets
         publishers={publishers.data || []}
@@ -372,7 +399,16 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
         </strong>
       </div>
       <div className="feed-layout">
-        <section className="feed-list" aria-label="资讯列表">
+        <section
+          className="feed-list"
+          id="feed-content-panel"
+          role="tabpanel"
+          aria-labelledby={sectionTabId(
+            "feed-content-panel",
+            params.get("content_type") || "",
+          )}
+          tabIndex={0}
+        >
           {articles.isPending && <Empty title="正在读取资讯" busy />}
           {articles.isError && (
             <Empty
@@ -410,7 +446,11 @@ export default function Feed({ favorite = false }: { favorite?: boolean }) {
                 {article.title_zh || article.title || "无标题内容"}
               </button>
               <p className="article-preview">
-                {article.summary_zh || "中文摘要尚未生成，来源原文已保留。"}
+                {summaryText(
+                  article.summary_zh,
+                  article.status,
+                  article.analysis_error,
+                )}
               </p>
               <Metrics article={article} />
               <ModelFacts article={article} />

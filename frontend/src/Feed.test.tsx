@@ -6,9 +6,10 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import Feed from "./pages/Feed";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { api, type Article, type Source } from "./lib/api";
@@ -79,8 +80,18 @@ beforeEach(() => {
           page: 1,
           page_size: 20,
         };
-      else if (url.pathname === "/api/sources") value = [source];
-      else if (url.pathname === "/api/categories") value = [];
+      else if (url.pathname === "/api/sources")
+        value = [
+          source,
+          ...[
+            ["hf-models", "hf_models"],
+            ["hf-datasets", "hf_datasets"],
+            ["hackernews", "hackernews"],
+            ["arxiv-ai", "arxiv"],
+          ].map(([id, kind]) => ({ ...source, id, name: id, kind })),
+        ];
+      else if (url.pathname === "/api/categories")
+        value = [{ id: "agents", label: "智能体", description: "测试分类" }];
       else if (url.pathname === "/api/publishers")
         value = [
           {
@@ -119,23 +130,131 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-function mount() {
+function NavigationProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="route">{location.search}</output>
+      <Link to="/feed?topic=llm">测试主题深链</Link>
+      <button onClick={() => navigate(-1)}>测试后退</button>
+      <button onClick={() => navigate(1)}>测试前进</button>
+    </>
+  );
+}
+function mount(entry = "/feed") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={client}>
         <TooltipProvider>
           <Feed />
+          <NavigationProbe />
         </TooltipProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
 }
 describe("feed interactions using isolated fixtures", () => {
+  it.each([
+    ["downloads", "models", "papers"],
+    ["likes", "datasets", "models"],
+    ["points", "", "tools"],
+    ["comments", "", "models"],
+  ])(
+    "clears the source scope of %s when changing content from %s to %s",
+    async (sort, initial, target) => {
+      mount(
+        `/feed?content_type=${initial}&topic=llm&q=test&from=2026-10-31&page=3`,
+      );
+      await screen.findByText("Test AI story");
+      fireEvent.change(screen.getByLabelText("排序方式"), {
+        target: { value: sort },
+      });
+      expect(screen.getByLabelText("按来源筛选")).not.toHaveValue("");
+      fireEvent.click(
+        screen.getByRole("tab", {
+          name:
+            target === "papers"
+              ? /^论文$/
+              : target === "tools"
+                ? /^工具$/
+                : /^模型$/,
+        }),
+      );
+      const route = new URLSearchParams(
+        screen.getByTestId("route").textContent!,
+      );
+      expect(route.get("content_type")).toBe(target);
+      expect(route.has("source")).toBe(false);
+      expect(route.has("sort")).toBe(false);
+      expect(route.has("page")).toBe(false);
+      expect(route.get("topic")).toBe("llm");
+      expect(route.get("q")).toBe("test");
+      expect(route.get("from")).toBe("2026-10-31");
+      await waitFor(() =>
+        expect(
+          vi.mocked(fetch).mock.calls.some(([path]) => {
+            const url = new URL(String(path), "http://localhost");
+            return (
+              url.pathname === "/api/articles" &&
+              url.searchParams.get("content_type") === target &&
+              !url.searchParams.has("source")
+            );
+          }),
+        ).toBe(true),
+      );
+    },
+  );
+  it("keeps an explicitly selected source when no platform sort imposed a scope", async () => {
+    mount("/feed?source=fixture&content_type=models");
+    await screen.findByText("Test AI story");
+    fireEvent.click(screen.getByRole("tab", { name: /^论文$/ }));
+    expect(
+      new URLSearchParams(screen.getByTestId("route").textContent!).get(
+        "source",
+      ),
+    ).toBe("fixture");
+    const tab = screen.getByRole("tab", { name: /^论文$/ });
+    const panel = screen.getByRole("tabpanel", { name: /^论文$/ });
+    expect(tab).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", tab.id);
+  });
+  it("restores category and topic facets from deep links and history without reopening a manually collapsed panel", async () => {
+    mount("/feed?category=agents");
+    const panel = within(screen.getByRole("region", { name: "资讯分类面板" }));
+    expect(await panel.findByRole("radio", { name: "智能体" })).toBeChecked();
+    expect(panel.getByRole("tab", { name: /资讯分类/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "收起分类面板" }));
+    expect(panel.queryByRole("tabpanel")).not.toBeInTheDocument();
+    expect(panel.getByRole("button", { name: "清除资讯分类" })).toBeVisible();
+    fireEvent.change(screen.getByLabelText("排序方式"), {
+      target: { value: "collected" },
+    });
+    expect(panel.queryByRole("tabpanel")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "测试主题深链" }));
+    expect(await panel.findByRole("radio", { name: "大模型" })).toBeChecked();
+    expect(panel.getByRole("tab", { name: /技术方向/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "测试后退" }));
+    expect(await panel.findByRole("radio", { name: "智能体" })).toBeChecked();
+    expect(panel.getByRole("tab", { name: /资讯分类/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "测试前进" }));
+    expect(await panel.findByRole("radio", { name: "大模型" })).toBeChecked();
+  });
   it("filters publishers and topics in a grid and clears the selected facet", async () => {
     mount();
+    fireEvent.click(await screen.findByRole("tab", { name: /发布团队/ }));
     fireEvent.click(
       await screen.findByRole("radio", { name: "月之暗面 Kimi" }),
     );
@@ -184,7 +303,10 @@ describe("feed interactions using isolated fixtures", () => {
           ),
       ).toBe(true),
     );
-    expect(screen.getByLabelText("资讯内容类型")).toHaveValue("papers");
+    expect(screen.getByRole("tab", { name: /^论文$/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     fireEvent.change(screen.getByLabelText("排序方式"), {
       target: { value: "points" },
     });
@@ -199,7 +321,10 @@ describe("feed interactions using isolated fixtures", () => {
           ),
       ).toBe(true),
     );
-    expect(screen.getByLabelText("资讯内容类型")).toHaveValue("");
+    expect(screen.getByRole("tab", { name: /^全部$/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
   it("prefers the persisted Chinese title and summary", async () => {
     item.title_zh = "测试模型发布";

@@ -7,6 +7,7 @@ from sqlalchemy import select, text, update
 
 from .analysis import AnalysisPipeline
 from .backfill import BackfillRequest, backfill_pages, backfill_plan
+from .chinese_summaries import has_chinese_summary, load_summary_policy
 from .collectors import COLLECTORS
 from .collectors.github_discovery import GitHubDiscoveryCollector
 from .collectors.huggingface import HuggingFaceCollector
@@ -388,7 +389,10 @@ class TaskManager:
                     article = await session.get(Article, article_id)
                     if not article:
                         raise LookupError("Article not found")
-                    if article.status in {"analyzed", "filtered"}:
+                    policy = await load_summary_policy(session)
+                    if has_chinese_summary(article) or (
+                        article.status in {"analyzed", "filtered"} and not policy.all_content
+                    ):
                         raise ValueError("该内容已完成处理，不重复调用模型")
                     article.retry_at, article.analysis_attempts = None, 0
                     article.metrics = {
